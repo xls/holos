@@ -224,6 +224,16 @@ impl App {
         }
     }
 
+    /// The active panel's directory, when it is a local one - the working
+    /// directory a program started from the panel runs in.
+    fn active_panel_dir(&self) -> Option<std::path::PathBuf> {
+        self.active_panel()
+            .active_tab()
+            .path
+            .local_path()
+            .map(std::path::Path::to_path_buf)
+    }
+
     /// the "run it", in whichever of the two places
     /// `open.execute_in` names.
     ///
@@ -259,19 +269,31 @@ impl App {
                     ));
                     return Ok(());
                 }
-                let mut line = argv
+                let command = argv
                     .iter()
                     .map(|word| crate::input::cmdline::shell_quote(word))
                     .collect::<Vec<String>>()
                     .join(" ");
-                line.push('\n');
-                self.to_shell_internal(line.as_bytes());
+                // In the active panel's directory, always: that is where the
+                // user is. The `cd` rides with the command rather than relying
+                // on the shell having been kept in step.
+                let line = match self.active_panel_dir() {
+                    Some(dir) => self.console.cwd_sync.run_in(&dir, command.as_bytes()),
+                    None => format!("{command}\r").into_bytes(),
+                };
+                self.to_shell_internal(&line);
                 self.command_was_run();
                 Ok(())
             }
             crate::config::ExecuteIn::Detached => {
+                // The active panel's directory, as in the console; the file's
+                // own folder only when the panel is not a local directory
+                // (a search result, an archive).
                 let parent = path.parent();
-                let cwd = parent.as_ref().and_then(VfsPath::local_path);
+                let panel_dir = self.active_panel_dir();
+                let cwd = panel_dir
+                    .as_deref()
+                    .or_else(|| parent.as_ref().and_then(VfsPath::local_path));
                 if let Err(err) = crate::ops::open::spawn_detached(&argv, cwd) {
                     self.message = Some(format!("{name}: {err}"));
                 }

@@ -251,6 +251,37 @@ impl CwdSync {
         }
     }
 
+    /// **Run a command in the panel's directory.** The bytes to write for
+    /// `command` (already quoted for the shell, no line ending) so that it
+    /// runs in `target`: `cd <target> && <command>`, ended with the Return key.
+    ///
+    /// For what hcmd runs itself - `Enter` on an executable - rather than what
+    /// the user types. [`CwdSync::panel_moved`] declines whenever it cannot be
+    /// sure the shell's line is empty, and a shell that never marks its prompt
+    /// is never synced at all; a program started from the panel then ran in
+    /// whatever directory the shell happened to be in, often the one hcmd was
+    /// launched from. Here the `cd` travels with the command, so there is no
+    /// line to be unsure about. Recorded like a written `cd`: one prompt comes
+    /// back for it, and its `OSC 7` is our echo, not news.
+    ///
+    /// A shell on another machine gets the command alone: a local path means
+    /// nothing there.
+    pub fn run_in(&mut self, target: &Path, command: &[u8]) -> Vec<u8> {
+        use std::os::unix::ffi::OsStrExt as _;
+
+        let mut line = Vec::new();
+        if !self.remote {
+            line.extend_from_slice(b"cd ");
+            line.extend_from_slice(&quote(target.as_os_str().as_bytes()));
+            line.extend_from_slice(b" && ");
+            self.shell_cwd = Some(target.to_path_buf());
+            self.unanswered = self.unanswered.saturating_add(1);
+        }
+        line.extend_from_slice(command);
+        line.push(b'\r');
+        line
+    }
+
     /// **Shell → panel.** An `OSC 7` arrived; decide what the panel should do.
     ///
     ///
@@ -426,6 +457,31 @@ mod tests {
         );
         assert_eq!(sync.shell_cwd(), Some(Path::new("/usr/share")));
         assert_eq!(sync.unanswered(), 1, "and it is waiting for its prompt");
+    }
+
+    #[test]
+    fn a_command_run_from_the_panel_carries_its_cd_and_is_counted_like_one() {
+        let mut sync = CwdSync::new();
+        let line = sync.run_in(Path::new("/tmp/My Reports"), b"./build.sh");
+        assert_eq!(line, b"cd '/tmp/My Reports' && ./build.sh\r".to_vec());
+        assert_eq!(sync.shell_cwd(), Some(Path::new("/tmp/My Reports")));
+        assert_eq!(sync.unanswered(), 1, "its prompt's OSC 7 is our echo");
+        // So the panel moving there next is no change at all.
+        assert_eq!(
+            sync.panel_moved(Path::new("/tmp/My Reports"), Some(true)),
+            Cd::AlreadyThere
+        );
+    }
+
+    #[test]
+    fn a_shell_on_another_machine_gets_the_command_without_a_local_cd() {
+        let mut sync = CwdSync::new();
+        sync.shell_is_foreign();
+        assert_eq!(
+            sync.run_in(Path::new("/home/me"), b"./x"),
+            b"./x\r".to_vec()
+        );
+        assert_eq!(sync.unanswered(), 0, "nothing written to wait for");
     }
 
     #[test]

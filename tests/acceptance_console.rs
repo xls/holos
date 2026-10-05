@@ -1805,6 +1805,66 @@ fn assert_terminal_restored(s: &Session, what: &str) {
 /// becomes observable: the marker lands in the byte stream between leaving the
 /// alternate screen and re-entering it, where nothing this application draws
 /// ever goes.
+/// A program started from the panel runs in the active panel's directory,
+/// whether or not the shell had been kept in step with it.
+///
+/// The bug: `Enter` on a script ran it wherever the shell happened to be -
+/// usually the directory hcmd was launched from - because the panel to shell
+/// `cd` declines whenever it cannot be sure the line is empty, and never runs
+/// for a shell that does not mark its prompt. `sync_cwd = false` stands in
+/// for that shell here: the panel walks into `subdir` and the shell does not
+/// follow, so only a `cd` that travels with the command puts the script there.
+#[test]
+fn a_script_run_from_the_panel_runs_in_the_panels_directory() {
+    let Some(bash) = which_bash() else {
+        return no_bash("the working-directory criterion");
+    };
+    let fix = Fixture::new("cwd");
+    let out = fix.path().join("where.out");
+    let script = fix.path().join("subdir/where.sh");
+    std::fs::write(&script, format!("#!/bin/sh\npwd > '{}'\n", out.display()))
+        .expect("write script");
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    }
+    let mut s = Session::start_with_config(
+        bash,
+        120,
+        30,
+        fix.path(),
+        Some(concat!(
+            "[console]\n",
+            "sync_cwd = false\n",
+            "[open]\n",
+            "execute = \"always\"\n",
+        )),
+    );
+    s.ready();
+
+    // Into subdir: `..` is row 0, `[subdir]` row 1.
+    s.press(keys::DOWN, "the cursor on [subdir]", |_| true);
+    s.press(keys::ENTER, "inside subdir", |t| t.contains("inner"));
+    // `..`, `inner.txt`, `where.sh`.
+    s.press(keys::DOWN, "the cursor on inner.txt", |_| true);
+    s.press(keys::DOWN, "the cursor on where.sh", |_| true);
+    assert!(
+        s.cursor_entry().contains("where"),
+        "on the script: {}",
+        s.cursor_entry()
+    );
+    s.send(keys::ENTER);
+    s.wait("the script to write where it ran", |_| {
+        std::fs::read_to_string(&out).is_ok_and(|text| text.ends_with('\n'))
+    });
+    let ran_in = std::fs::read_to_string(&out).expect("the script ran");
+    assert_eq!(
+        Path::new(ran_in.trim()),
+        fix.path().join("subdir"),
+        "the script ran in the panel's directory, not the shell's"
+    );
+}
+
 #[test]
 fn criterion_11_f4_hands_the_terminal_over_and_puts_every_step_back() {
     let Some(bash) = which_bash() else {
