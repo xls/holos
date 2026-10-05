@@ -2,6 +2,13 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.0
+
+- Keys moved: `Ctrl+F1`-`Ctrl+F5` sort by columns 1-5 and `Ctrl+F6`-`Ctrl+F9` repeat columns 1-4, for desktops that take the low keys; `Ctrl+0` puts the default order back; compare files is `Ctrl+Alt+C`. The fixed name/extension/date/size sorts are unbound by default and can be bound in `keymap.toml`.
+- With a quick search typed, `Down` and `Up` move to the next and previous match and keep the search, so every name matching what was typed can be reached.
+- A container that fails to open puts the panel back exactly as it was, instead of scrolling the file to the bottom row.
+- Internal: the job lifecycle is one state type, the operations module is split by responsibility, and the device picker answers with a typed result.
+
 ## v0.16.0
 
 - `Alt+X` sends the selection to a LocalSend device: a native, send-only implementation of the protocol - devices found by multicast and a subnet scan, or a typed address; PIN when the device asks; runs as a job with a progress bar and cancel; encrypted to the device's own certificate, pinned to the fingerprint it announced. The picker says what is going (`Send folder - 12 files`) and warns past 50 files.
