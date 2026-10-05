@@ -203,7 +203,11 @@ mod tests {
         assert!(app.left.active_tab().is_quick_filtered());
         assert_eq!(name(&app), "docs", "the first match");
         press(&mut app, KeyCode::Up);
-        assert_eq!(name(&app), "dump.sql", "Up at the top goes round to the bottom");
+        assert_eq!(
+            name(&app),
+            "dump.sql",
+            "Up at the top goes round to the bottom"
+        );
         press(&mut app, KeyCode::Down);
         assert_eq!(name(&app), "docs", "and Down at the bottom back to the top");
         press(&mut app, KeyCode::Down);

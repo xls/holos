@@ -810,7 +810,10 @@ impl Tab {
             .collect();
         let cursor = self.cursor;
         let next = if forward {
-            stops.iter().find(|&&i| i > cursor).or_else(|| stops.first())
+            stops
+                .iter()
+                .find(|&&i| i > cursor)
+                .or_else(|| stops.first())
         } else {
             stops
                 .iter()
