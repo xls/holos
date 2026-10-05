@@ -315,6 +315,10 @@ pub struct PanelConfig {
     /// Whether typing filters the listing to matches instead of only jumping
     /// to the first one. Off by default: the classic type-to-jump.
     pub quick_search_filter: bool,
+    /// Backspace first puts the cursor on the `..` row, and only goes up a
+    /// level when the cursor is already there. Off by default: Backspace goes
+    /// straight up.
+    pub backspace_to_parent_row: bool,
     /// The animation shown in the size column while a directory is walked.
     pub size_walk_style: SizeWalkStyle,
     /// What bare digits do.
@@ -352,6 +356,7 @@ impl Default for PanelConfig {
             quick_search: QuickSearchMode::Prefix,
             quick_search_case: QuickSearchCase::Smart,
             quick_search_filter: false,
+            backspace_to_parent_row: false,
             size_walk_style: SizeWalkStyle::Dots,
             digit_keys: DigitKeys::QuickSearch,
             max_tabs: 9,

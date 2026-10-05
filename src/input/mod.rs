@@ -896,8 +896,20 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
             // `Backspace` pops the buffer when one is running and only then
             // goes up. The rule is about that key: `Ctrl+PgUp` is bound to the
             // same action and always goes up.
-            if press.code == KeyCode::Backspace && app.active_panel_mut().quick.pop() {
+            let backspace = press.code == KeyCode::Backspace;
+            // `panel.backspace_to_parent_row`: the first Backspace lands on
+            // `..`, the next one goes up. Only the key, like the buffer rule.
+            let tab = app.active_panel().active_tab();
+            let to_parent_row = tab
+                .entries
+                .iter()
+                .position(|e| e.is_parent)
+                .filter(|&row| row != tab.cursor)
+                .filter(|_| backspace && app.config.panel.backspace_to_parent_row);
+            if backspace && app.active_panel_mut().quick.pop() {
                 panel::rematch(app);
+            } else if let Some(row) = to_parent_row {
+                app.move_cursor_to(row);
             } else {
                 let here = app.active_panel().active_tab().path.clone();
                 if let Some(parent) = here.parent() {
@@ -2495,6 +2507,43 @@ mod tests {
         assert_eq!(app.left.quick.buffer, "my ");
         assert!(app.take_pending_jobs().is_empty(), "nothing was sized");
         assert!(app.left.active_tab().marks.is_empty(), "and nothing marked");
+    }
+
+    #[test]
+    fn with_the_option_backspace_lands_on_the_parent_row_before_going_up() {
+        let entries = || {
+            vec![
+                Entry::parent_entry(),
+                Entry::dir("src"),
+                Entry::file("main.rs"),
+            ]
+        };
+        let mut app = app_with(entries());
+        app.config.panel.backspace_to_parent_row = true;
+        app.left.active_tab_mut().cursor = 2;
+        let _ = app.take_pending_reads();
+
+        press(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
+        assert_eq!(
+            app.left.active_tab().cursor,
+            0,
+            "the first press finds `..`"
+        );
+        assert!(app.take_pending_reads().is_empty(), "and does not go up");
+
+        press(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
+        assert_eq!(
+            app.take_pending_reads().len(),
+            1,
+            "the second press goes up"
+        );
+
+        // Off, the default: one press goes straight up.
+        let mut app = app_with(entries());
+        app.left.active_tab_mut().cursor = 2;
+        let _ = app.take_pending_reads();
+        press(&mut app, KeyCode::Backspace, KeyModifiers::NONE);
+        assert_eq!(app.take_pending_reads().len(), 1);
     }
 
     #[test]

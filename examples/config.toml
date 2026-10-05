@@ -62,6 +62,10 @@ quick_search_case = "smart"
 # Whether typing filters the listing to matches instead of only jumping
 # to the first one. Off by default: the classic type-to-jump.
 quick_search_filter = false
+# Backspace first puts the cursor on the `..` row, and only goes up a
+# level when the cursor is already there. Off by default: Backspace goes
+# straight up.
+backspace_to_parent_row = false
 # The animation shown in the size column while a directory is walked.
 size_walk_style = "dots"
 # What bare digits do.
