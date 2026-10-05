@@ -94,6 +94,55 @@ impl App {
         true
     }
 
+    /// `Up` / `Down` while a quick search is typed: the previous or next row
+    /// that matches it, keeping the search.
+    ///
+    /// Without this an arrow ended the search and stepped one row, so of
+    /// several names matching what was typed only the first could ever be
+    /// reached - a folder that sorted first kept the cursor away from every
+    /// file sharing its prefix. Returns false when no search is typed, or in
+    /// filter mode, where the arrows already walk only the matches; the
+    /// caller then moves the cursor the ordinary way. At the last match in
+    /// the direction asked the cursor stays put, with the search.
+    pub fn step_quick_match(&mut self, forward: bool) -> bool {
+        if self.config.panel.quick_search_filter || self.active_panel().quick.is_empty() {
+            return false;
+        }
+        let mode = self.config.panel.quick_search;
+        let case = self.config.panel.quick_search_case;
+        let query = self.active_panel().quick.buffer.clone();
+        let panel = self.active_panel_mut();
+        let tab = panel.active_tab();
+        let cursor = tab.cursor;
+        let matches = |(_, e): &(usize, &crate::vfs::Entry)| {
+            !e.is_parent && crate::input::quicksearch::quick_match(&e.name, &query, mode, case)
+        };
+        let found = if forward {
+            tab.entries
+                .iter()
+                .enumerate()
+                .skip(cursor.saturating_add(1))
+                .find(matches)
+                .map(|(i, _)| i)
+        } else {
+            tab.entries
+                .iter()
+                .enumerate()
+                .take(cursor)
+                .rev()
+                .find(matches)
+                .map(|(i, _)| i)
+        };
+        if let Some(index) = found {
+            let rows = panel.view_rows;
+            let tab = panel.active_tab_mut();
+            tab.cursor = index;
+            tab.scroll_into_view(rows);
+            self.note_quick_view_cursor();
+        }
+        true
+    }
+
     /// `Insert` / `Space`: toggle the mark under the cursor.
     /// The `..` row never marks.
     /// Delegated, and that is the whole point: these three used to key marks
@@ -125,6 +174,34 @@ mod tests {
     use crate::app::tests::app_with;
     use crate::config::{Config, Keymap, Theme};
     use crate::vfs::{Entry, VfsPath};
+
+    #[test]
+    fn the_arrows_walk_the_quick_search_matches_and_keep_the_search() {
+        use crate::input::{KeyCode, KeyEvent, KeyModifiers, dispatch};
+        // The bug: `d` found `docs`, and Down then ended the search and
+        // stepped onto `alpha` - the two files matching `d` were unreachable.
+        let mut app = app_with(&["docs", "alpha", "data.csv", "dump.sql", "zeta"]);
+        let press = |app: &mut App, code: KeyCode| {
+            dispatch(app, KeyEvent::new(code, KeyModifiers::NONE)).expect("dispatch");
+        };
+        let cursor = |app: &App| app.left.active_tab().cursor;
+        press(&mut app, KeyCode::Char('d'));
+        assert_eq!(cursor(&app), 0, "the first match");
+        press(&mut app, KeyCode::Down);
+        assert_eq!(cursor(&app), 2, "the next match, skipping alpha");
+        press(&mut app, KeyCode::Down);
+        assert_eq!(cursor(&app), 3);
+        press(&mut app, KeyCode::Down);
+        assert_eq!(cursor(&app), 3, "the last match stays put");
+        assert_eq!(app.left.quick.buffer, "d", "and the search is kept");
+        press(&mut app, KeyCode::Up);
+        assert_eq!(cursor(&app), 2, "Up walks back through the matches");
+        // Esc ends the search; the arrows are ordinary again.
+        press(&mut app, KeyCode::Esc);
+        assert!(app.left.quick.is_empty());
+        press(&mut app, KeyCode::Down);
+        assert_eq!(cursor(&app), 3, "one row");
+    }
 
     #[test]
     fn quick_search_moves_the_cursor_to_the_first_match() {

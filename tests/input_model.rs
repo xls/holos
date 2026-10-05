@@ -220,7 +220,11 @@ fn a_first_character_that_matches_nothing_starts_no_search() {
 fn the_buffer_clears_on_cursor_movement_and_on_leaving_the_directory() {
     let mut app = app_with(&["alpha", "thorin"]);
     type_text(&mut app, "tho");
+    // Up and Down walk the matches and keep the search; any other cursor
+    // move ends it.
     press(&mut app, KeyCode::Down, NONE);
+    assert_eq!(buffer(&app), "tho", "Down steps to the next match");
+    press(&mut app, KeyCode::PageDown, NONE);
     assert!(buffer(&app).is_empty(), "cursor movement clears it");
 
     type_text(&mut app, "tho");

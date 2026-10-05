@@ -281,9 +281,9 @@ pub fn getting_started() -> String {
     );
     out.push_str(
         "Typing in a panel is quick search, not a command: the cursor jumps to\n\
-         the first entry that matches what you have typed, Backspace steps back\n\
-         through the matches, and Esc clears the search before it clears the\n\
- marks.\n\n",
+         the first entry that matches what you have typed, Down and Up move to\n\
+         the next and previous match, Backspace shortens what you typed, and\n\
+         Esc clears the search before it clears the marks.\n\n",
     );
     out.push_str(
         "The command line is below the panels and keeps its own caret. Typing a\n\

@@ -848,8 +848,18 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         }
 
         // ------------------------------------------------- panel cursor -----
-        A::CursorUp => app.move_cursor(-1),
-        A::CursorDown => app.move_cursor(1),
+        // With a quick search typed the arrows walk its matches; otherwise
+        // they step a row.
+        A::CursorUp => {
+            if !app.step_quick_match(false) {
+                app.move_cursor(-1);
+            }
+        }
+        A::CursorDown => {
+            if !app.step_quick_match(true) {
+                app.move_cursor(1);
+            }
+        }
         A::CursorPageUp => {
             let rows = app.active_panel().view_rows.max(1);
             app.move_cursor(isize::try_from(rows).unwrap_or(1).saturating_neg());
