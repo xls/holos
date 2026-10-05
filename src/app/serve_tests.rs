@@ -68,7 +68,19 @@ fn the_share_lives_exactly_as_long_as_its_dialog() {
     );
 
     // The request the fetch made reaches the dialog's log through the loop.
-    let event = rx.try_recv().expect("the listener reported the request");
+    // The listener reports after it has written the answer and closed the
+    // socket, so the fetch can return first; wait for the report rather than
+    // expect it already there - an empty channel here was a race on a busy
+    // CI runner, not a lost request.
+    let mut event = None;
+    for _ in 0..500 {
+        if let Ok(arrived) = rx.try_recv() {
+            event = Some(arrived);
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let event = event.expect("the listener reported the request within 5 s");
     app.apply_serve_event(event);
     let log = app
         .top_dialog()
