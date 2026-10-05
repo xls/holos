@@ -47,7 +47,8 @@ compare_dirs_content = ["ctrl+shift+f2"]
 # The git history of the panel's directory: commits as folders, the files each
 # changed inside them, readable and diffable at that commit. Alt+V.
 git_history       = ["alt+v"]
-compare_files     = ["ctrl+f2"]
+# ctrl+f2 is the column-2 sort (see below), so comparing two files is here.
+compare_files     = ["ctrl+alt+c"]
 # Checksums. The extension of the name you give chooses the digest, so there is
 # one key rather than one per algorithm; verify runs on a .sha256 or .sfv under
 # the cursor and needs no dialog at all.
@@ -63,9 +64,9 @@ merge_file        = ["alt+f12"]
 create_symlink    = ["ctrl+alt+l"]
 create_hardlink   = ["ctrl+alt+h"]
 edit_permissions  = ["ctrl+alt+p"]
-# The pair of ctrl+f2: that one answers whether two files differ, this one
-# answers how. alt+shift+f2 rather than a ctrl+F<n>, because ctrl+f3 to ctrl+f6
-# are the sort keys Total Commander puts there.
+# The pair of compare_files: that one answers whether two files differ, this
+# one answers how. alt+shift+f2 rather than a ctrl+F<n>, because ctrl+f1 to
+# ctrl+f9 are the column sort keys.
 diff_files        = ["alt+shift+f2"]
 
 # The second binding on each of these is the legacy-terminal fallback:
@@ -188,13 +189,15 @@ tab_7             = ["alt+7"]
 tab_8             = ["alt+8"]
 tab_9             = ["alt+9"]
 
-# Positional sort: ctrl+<n> sorts the active panel by its n-th column, left to
-# right, following panel.columns.order. Same key again reverses.
-sort_by_column_1  = ["ctrl+1"]
-sort_by_column_2  = ["ctrl+2"]
-sort_by_column_3  = ["ctrl+3"]
-sort_by_column_4  = ["ctrl+4"]
-sort_by_column_5  = ["ctrl+5"]
+# Positional sort: ctrl+<n> and ctrl+F<n> sort the active panel by its n-th
+# column, left to right, following panel.columns.order. Same key again
+# reverses. ctrl+f6 to ctrl+f9 repeat columns 1 to 4, for a desktop or terminal
+# that takes the low ctrl+F keys for itself. ctrl+0 puts the default order back.
+sort_by_column_1  = ["ctrl+1", "ctrl+f1", "ctrl+f6"]
+sort_by_column_2  = ["ctrl+2", "ctrl+f2", "ctrl+f7"]
+sort_by_column_3  = ["ctrl+3", "ctrl+f3", "ctrl+f8"]
+sort_by_column_4  = ["ctrl+4", "ctrl+f4", "ctrl+f9"]
+sort_by_column_5  = ["ctrl+5", "ctrl+f5"]
 sort_by_column_6  = ["ctrl+6"]
 sort_by_column_7  = ["ctrl+7"]
 sort_by_column_8  = ["ctrl+8"]
@@ -213,20 +216,21 @@ sort_secondary_6  = ["ctrl+shift+6"]
 sort_secondary_7  = ["ctrl+shift+7"]
 sort_secondary_8  = ["ctrl+shift+8"]
 sort_secondary_9  = ["ctrl+shift+9"]
-# ctrl+shift+0 clears the secondary sort. ctrl+f7 (unsorted)
-# clears it too, which is the route that survives a legacy terminal.
+# ctrl+shift+0 clears the secondary sort. ctrl+0 (default order) clears it
+# too, which is the route that survives a legacy terminal.
 sort_secondary_clear = ["ctrl+shift+0"]
 
-# Fixed-field sorts, independent of column position (TC muscle memory).
-sort_by_name      = ["ctrl+f3"]
-sort_by_ext       = ["ctrl+f4"]
-sort_by_date      = ["ctrl+f5"]
-sort_by_size      = ["ctrl+f6"]
-# ctrl+f7 resets to the default order rather than removing the order: an
+# Fixed-field sorts, independent of column position. Unbound: the ctrl+F keys
+# sort by column now. Bind them here to sort by a field wherever its column is.
+sort_by_name      = []
+sort_by_ext       = []
+sort_by_date      = []
+sort_by_size      = []
+# ctrl+0 resets to the default order rather than removing the order: an
 # unsorted listing is not an arrangement, and the only way back from one was to
 # remember what had been sorted by. Unsorted keeps its place on the F9 sort
-# menu and moves to shift+f7.
-sort_default      = ["ctrl+f7"]
+# menu and on shift+f7.
+sort_default      = ["ctrl+0"]
 sort_unsorted     = ["shift+f7"]
 
 [panel]

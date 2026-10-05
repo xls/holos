@@ -1147,8 +1147,7 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         A::SortByDate => app.sort_active(SortKey::Column(ColumnId::Date)),
         A::SortBySize => app.sort_active(SortKey::Column(ColumnId::Size)),
         A::SortUnsorted => app.sort_active(SortKey::Unsorted),
-        // `Ctrl+F7`. Total Commander puts "unsorted" here and it is the one
-        // sort nobody wants twice: a listing in whatever order the filesystem
+        // `Ctrl+0`. "Unsorted" is the one sort nobody wants twice: a listing in whatever order the filesystem
         // handed it over is not an order, and the way back from it was to
         // remember which column had been sorted by. This is the way back.
         A::SortDefault => app.sort_active(SortKey::default()),

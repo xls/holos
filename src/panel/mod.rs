@@ -224,7 +224,7 @@ impl<'de> serde::Deserialize<'de> for ColumnId {
 /// What a panel is sorted by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SortKey {
-    /// Directory order as the backend produced it (`Ctrl+F7`).
+    /// Directory order as the backend produced it (`Shift+F7`).
     Unsorted,
     /// Sorted by a column's field.
     Column(ColumnId),
@@ -1466,7 +1466,7 @@ impl Tab {
                 return b.is_dir().cmp(&a.is_dir());
             }
             match key {
-                // `Ctrl+F7` leaves the backend's own order alone, so there is
+                // Unsorted leaves the backend's own order alone, so there is
                 // no tiebreak to apply either - `sort_by` is stable, and
                 // `Equal` everywhere is what preserves it.
                 SortKey::Unsorted => std::cmp::Ordering::Equal,

@@ -187,13 +187,12 @@ const COMMANDS: [Action; 15] = [
 ///
 const NET: [Action; 1] = [Action::ConnectToggle];
 
-/// The `Show` menu's rows below the sort block: the fixed-field
-/// sorts, `show_hidden` and the re-read.
-const SHOW_TAIL: [Action; 7] = [
-    Action::SortByName,
-    Action::SortByExt,
-    Action::SortByDate,
-    Action::SortBySize,
+/// The `Show` menu's rows below the sort block: the default order,
+/// `show_hidden` and the re-read. The fixed-field sorts are not here: they
+/// are unbound by default, and the sort block above already sorts by every
+/// column.
+const SHOW_TAIL: [Action; 4] = [
+    Action::SortDefault,
     Action::SortUnsorted,
     Action::ShowHidden,
     Action::Reread,

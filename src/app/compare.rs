@@ -149,7 +149,7 @@ impl App {
 
     /// Show the file under each panel's cursor as a unified diff.
     ///
-    /// The other half of `Ctrl+F2`'s question. That one answers "the same, or
+    /// The other half of compare files' question. That one answers "the same, or
     /// different at byte 4,231"; this one answers "different how", which is
     /// the question a reader asks next often enough that answering only the
     /// first was leaving the job half done.

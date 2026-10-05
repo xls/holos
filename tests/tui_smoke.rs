@@ -1552,7 +1552,7 @@ fn the_resize_dialog_says_what_it_is_resizing_and_what_it_will_write() {
     );
 }
 
-/// Two files with identical contents and one that differs, for `Ctrl+F2`.
+/// Two files with identical contents and one that differs, for compare files.
 struct ComparePair {
     root: PathBuf,
 }
@@ -1577,16 +1577,17 @@ impl Drop for ComparePair {
     }
 }
 
-/// `Ctrl+F2`, in the encoding a terminal without the Kitty protocol sends.
-const CTRL_F2: &[u8] = b"\x1b[1;5Q";
+/// `Ctrl+Alt+C`, compare files, in the encoding a terminal without the Kitty
+/// protocol sends: Esc then the control byte.
+const CTRL_ALT_C: &[u8] = b"\x1b\x03";
 
 #[test]
-fn ctrl_f2_says_two_files_with_the_same_bytes_are_identical() {
+fn compare_files_says_two_files_with_the_same_bytes_are_identical() {
     let fixture = ComparePair::new("same");
     let mut run = Run::new(100, 30);
     run.cwd = Some(fixture.root.clone());
     // Left cursor onto a.txt, then across and down onto b.txt.
-    let input = keys(&[DOWN, TAB, DOWN, DOWN, CTRL_F2]);
+    let input = keys(&[DOWN, TAB, DOWN, DOWN, CTRL_ALT_C]);
     run.input = &input;
     let (parser, _) = run_in_pty(run);
     let text = plain(&parser);
@@ -1601,13 +1602,13 @@ fn ctrl_f2_says_two_files_with_the_same_bytes_are_identical() {
 }
 
 #[test]
-fn ctrl_f2_says_where_two_files_stop_agreeing() {
+fn compare_files_says_where_two_files_stop_agreeing() {
     let fixture = ComparePair::new("differ");
     let mut run = Run::new(100, 30);
     run.cwd = Some(fixture.root.clone());
     // Left cursor onto a.txt, then across and down onto c.txt, which differs
     // from it in its last byte only.
-    let input = keys(&[DOWN, TAB, DOWN, DOWN, DOWN, CTRL_F2]);
+    let input = keys(&[DOWN, TAB, DOWN, DOWN, DOWN, CTRL_ALT_C]);
     run.input = &input;
     let (parser, _) = run_in_pty(run);
     let text = plain(&parser);

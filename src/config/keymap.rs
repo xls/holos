@@ -743,6 +743,49 @@ impl Keymap {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn ctrl_f_keys_sort_by_column_and_f6_to_f9_repeat_the_first_four() {
+        // The owner's scheme: ctrl+F1..F5 are columns 1..5, and ctrl+F6..F9
+        // repeat columns 1..4 for a desktop that takes the low keys.
+        let km = Keymap::builtin();
+        let ctrl_f = |n: u8| press(KeyCode::F(n), KeyModifiers::CONTROL);
+        for (n, want) in [
+            (1, Action::SortByColumn1),
+            (2, Action::SortByColumn2),
+            (3, Action::SortByColumn3),
+            (4, Action::SortByColumn4),
+            (5, Action::SortByColumn5),
+            (6, Action::SortByColumn1),
+            (7, Action::SortByColumn2),
+            (8, Action::SortByColumn3),
+            (9, Action::SortByColumn4),
+        ] {
+            assert_eq!(
+                km.resolve(KeyContext::Panel, ctrl_f(n)),
+                Resolution::Action(want),
+                "ctrl+f{n}"
+            );
+        }
+        // What used to live there moved, not vanished.
+        assert_eq!(
+            km.resolve(
+                KeyContext::Panel,
+                press(KeyCode::Char('0'), KeyModifiers::CONTROL)
+            ),
+            Resolution::Action(Action::SortDefault)
+        );
+        assert_eq!(
+            km.resolve(
+                KeyContext::Panel,
+                press(
+                    KeyCode::Char('c'),
+                    KeyModifiers::CONTROL | KeyModifiers::ALT
+                )
+            ),
+            Resolution::Action(Action::CompareFiles)
+        );
+    }
+
+    #[test]
     fn the_viewer_hex_keys_resolve() {
         let km = Keymap::builtin();
         assert!(km.warnings.is_empty(), "builtin warns: {:#?}", km.warnings);
