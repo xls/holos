@@ -212,6 +212,7 @@ impl App {
         }
         let name = entry.name.clone();
         let from = tab.path.clone();
+        let scroll = tab.scroll;
         let container = tab.current_path()?;
         let inside = container.clone().with_segment(kind, "/");
         self.navigate_selecting(side, inside, None);
@@ -224,6 +225,7 @@ impl App {
                 tab: tab_index,
                 from,
                 name,
+                scroll,
                 container,
                 tried: kind,
                 retry: false,

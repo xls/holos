@@ -600,6 +600,15 @@ pub struct Tab {
     /// Not in the design; requested behaviour, and what Total Commander does.
     pub pending_select: Option<String>,
 
+    /// The scroll offset to restore along with [`Tab::pending_select`], when
+    /// the listing being re-read is one the user was already looking at.
+    ///
+    /// A container that fails to open puts the panel back on the directory
+    /// it was entered from. That re-read starts at the top, and without this
+    /// the cursor's file was scrolled just far enough into view to land on
+    /// the bottom row - the panel jumped although nothing in it had changed.
+    pub pending_scroll: Option<usize>,
+
     /// The virtual listing this tab is showing, or `None` for a real directory.
     ///
     ///
@@ -660,6 +669,7 @@ impl Tab {
             loading: false,
             generation: 0,
             pending_select: None,
+            pending_scroll: None,
             replace_on_next_batch: false,
             virtual_view: None,
             remote_view: None,
@@ -938,6 +948,14 @@ impl Tab {
         };
         self.cursor = index;
         self.pending_select = None;
+        // The window the user had, when the cursor still falls in it from the
+        // top; the draw's own scroll-into-view clamps the bottom edge and the
+        // end of the listing.
+        if let Some(scroll) = self.pending_scroll.take()
+            && scroll <= index
+        {
+            self.scroll = scroll;
+        }
         true
     }
 

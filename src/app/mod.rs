@@ -91,6 +91,9 @@ struct ContainerAttempt {
     from: VfsPath,
     /// The container's own file name, to land the cursor back on it.
     name: String,
+    /// The panel's scroll offset when the container was entered, so a
+    /// failure puts the window back where it was and not only the cursor.
+    scroll: usize,
     /// The path of the file that was entered, so `Ctrl+PgDn`'s retry addresses
     /// the same bytes the first attempt did.
     ///

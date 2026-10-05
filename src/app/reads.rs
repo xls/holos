@@ -307,6 +307,7 @@ impl App {
         tab.loading = true;
         tab.generation = generation;
         tab.pending_select = select;
+        tab.pending_scroll = None;
         tab.column_plan = remembered;
         // "Entering a directory from within a virtual listing
         // also leaves it, since the panel then has a real path." Every route
@@ -789,6 +790,7 @@ impl App {
                 // not going to. Drop the request rather than letting it fire
                 // against a later, unrelated read of the same tab.
                 tab.pending_select = None;
+                tab.pending_scroll = None;
                 // a mark survives a re-read where its path still
                 // exists, and only then. The listing is complete here, so this
                 // is the one point at which "still exists" can be decided.
@@ -851,7 +853,11 @@ impl App {
                     }
                     Some(attempt) if listed_nothing => {
                         let name = attempt.name.clone();
-                        self.navigate_selecting(attempt.side, attempt.from, Some(attempt.name));
+                        let (side, scroll) = (attempt.side, attempt.scroll);
+                        self.navigate_selecting(side, attempt.from, Some(attempt.name));
+                        // Back where it was, window and all: the panel did not
+                        // change, so it must not appear to have moved.
+                        self.panel_mut(side).active_tab_mut().pending_scroll = Some(scroll);
                         self.message = Some(format!("{name}: {message}"));
                     }
                     _ => self.message = Some(message),

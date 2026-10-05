@@ -918,6 +918,51 @@ async fn ctrl_pgdn_tries_an_image_after_an_archive_and_then_gives_up() {
 }
 
 #[tokio::test]
+async fn a_container_that_fails_to_open_puts_the_panel_back_without_scrolling_it() {
+    // The bug: Enter on a damaged archive came back to the directory with the
+    // archive on the bottom row, because the re-read started at the top and
+    // scrolling the cursor into view stops at the first row that shows it.
+    let tree = ArchiveTree::new("no-scroll");
+    let mut names: Vec<String> = (0..60).map(|i| format!("file-{i:02}.txt")).collect();
+    names.push("file-30-broken.zip".to_string());
+    for name in &names {
+        let body: &[u8] = if name.ends_with(".zip") {
+            b"not a zip at all"
+        } else {
+            b"x"
+        };
+        std::fs::write(tree.path(name), body).expect("write");
+    }
+    let rows = 20;
+    let mut app = app_at(&tree.root, &[]);
+    app.left.view_rows = rows;
+    app.navigate(Side::Left, VfsPath::local(&tree.root));
+    service_reads(&mut app).await;
+    let tab = app.left.active_tab_mut();
+    let at = tab
+        .entries
+        .iter()
+        .position(|e| e.name == "file-30-broken.zip")
+        .expect("listed");
+    // The archive mid-window, the way a user scrolling down would see it.
+    tab.scroll = at.saturating_sub(8);
+    tab.cursor = at;
+    let before = tab.scroll;
+
+    app.open_under_cursor();
+    assert_eq!(app.left.active_tab().path.backend(), BackendKind::Archive);
+    service_reads(&mut app).await;
+    // The failure navigates back; drive that read too.
+    service_reads(&mut app).await;
+    let tab = app.left.active_tab_mut();
+    assert_eq!(tab.path, VfsPath::local(&tree.root), "back where it was");
+    assert_eq!(tab.cursor_name().as_deref(), Some("file-30-broken.zip"));
+    // What the draw does every frame; it must find nothing to change.
+    tab.scroll_into_view(rows);
+    assert_eq!(tab.scroll, before, "the window did not move");
+}
+
+#[tokio::test]
 async fn ctrl_pgdn_opens_a_disk_image_whose_extension_says_nothing() {
     // The retry earning its place: a FAT volume in a file called
     // `backup.dat` lists, on a key that used to try archives only.
