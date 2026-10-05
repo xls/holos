@@ -789,6 +789,43 @@ impl Tab {
             .map_or(0, |(index, _)| index)
     }
 
+    /// One step to the next (or previous) row that `wanted` accepts, wrapping
+    /// from the last to the first and back. The `..` row is never a stop.
+    ///
+    /// `Up` and `Down` while a quick search is on: walking its matches should
+    /// go round, not stop dead at the last one with no sign there is nothing
+    /// further. False when no row is wanted at all, and the cursor stays.
+    pub fn step_wrapping<F: Fn(&Entry) -> bool>(
+        &mut self,
+        forward: bool,
+        rows: usize,
+        wanted: F,
+    ) -> bool {
+        let stops: Vec<usize> = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| !e.is_parent && wanted(e))
+            .map(|(i, _)| i)
+            .collect();
+        let cursor = self.cursor;
+        let next = if forward {
+            stops.iter().find(|&&i| i > cursor).or_else(|| stops.first())
+        } else {
+            stops
+                .iter()
+                .rev()
+                .find(|&&i| i < cursor)
+                .or_else(|| stops.last())
+        };
+        let Some(&index) = next else {
+            return false;
+        };
+        self.cursor = index;
+        self.scroll_into_view(rows);
+        true
+    }
+
     /// The last shown row, for `End` under a filter.
     fn last_shown(&self) -> usize {
         (0..self.entries.len())
