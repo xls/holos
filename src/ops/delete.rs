@@ -854,12 +854,21 @@ mod tests {
         if fs::write(&probe, b"probe").is_err() {
             return false;
         }
-        if trash::delete(&probe).is_err() {
-            let _ = fs::remove_file(&probe);
-            return false;
+        // A few tries: on macOS the crate trashes through Finder, and the
+        // first call on a cold CI runner can fail and the next one succeed.
+        // One failed try read as "no trash here" while the job's own call a
+        // moment later worked - a probe that disagreed with the machine.
+        for attempt in 0..3 {
+            if trash::delete(&probe).is_ok() {
+                purge(&probe);
+                return true;
+            }
+            if attempt < 2 {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
         }
-        purge(&probe);
-        true
+        let _ = fs::remove_file(&probe);
+        false
     }
 
     /// Take one path's records out of the trash again, so a test leaves
@@ -1266,7 +1275,7 @@ mod tests {
             None,
         ));
 
-        if !available {
+        if !available && !summary.failures.is_empty() {
             // No trash on this filesystem, or no HOME. The contract for that
             // case is asserted instead, and it is still an assertion: the job
             // has to say so, and the file has to be untouched.
