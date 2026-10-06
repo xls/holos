@@ -2023,7 +2023,15 @@ fn quitting_with_an_archive_open_restores_the_terminal_and_clears_the_cache() {
         text.contains("payload.tar.gz#/") || text.contains("member-0")
     });
 
-    // The session cache exists now, and the dead session's is gone.
+    // The session cache exists now, and the dead session's is gone. Waited
+    // for, not assumed: the panel shows the archive's path the moment it
+    // navigates, and the backend makes its cache directory a beat later on
+    // the read thread - a slow runner checked in between.
+    s.wait_now("the session's cache directory", |_| {
+        caches(&t.temp())
+            .iter()
+            .any(|n| n != "hcmd-archive-4294967294-dead")
+    });
     let live = caches(&t.temp());
     assert!(
         live.iter().any(|n| n != "hcmd-archive-4294967294-dead"),
@@ -2070,6 +2078,11 @@ fn sigterm_with_an_archive_open_restores_the_terminal_and_clears_the_cache() {
     s.wait_now("the archive listing", |s| {
         let text = s.text();
         text.contains("payload.tar.gz#/") || text.contains("member-0")
+    });
+    // Waited for, for the reason the test above gives: the path is on screen
+    // before the read thread has made the cache.
+    s.wait_now("the session's cache directory", |_| {
+        !caches(&t.temp()).is_empty()
     });
     assert!(
         !caches(&t.temp()).is_empty(),
