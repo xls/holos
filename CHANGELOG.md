@@ -2,6 +2,12 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.1
+
+- With a quick search on, `Up` on the first match goes round to the last and `Down` on the last to the first, in both the jump and the filter search.
+- A program or script run from the panel runs in the active panel's folder, wherever the shell happened to be.
+- `panel.backspace_to_parent_row`: Backspace first puts the cursor on `..` and goes up on the next press. Off by default.
+
 ## v0.17.0
 
 - Keys moved: `Ctrl+F1`-`Ctrl+F5` sort by columns 1-5 and `Ctrl+F6`-`Ctrl+F9` repeat columns 1-4, for desktops that take the low keys; `Ctrl+0` puts the default order back; compare files is `Ctrl+Alt+C`. The fixed name/extension/date/size sorts are unbound by default and can be bound in `keymap.toml`.
