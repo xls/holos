@@ -555,6 +555,8 @@ pub fn dialog_answered(app: &mut App, id: DialogId, job: Option<JobId>, result: 
         (DialogId::SelfUpdate, DialogResult::Confirm(answer)) => {
             app.answer_self_update(*answer);
         }
+        // The new binary is on disk: restart into it, or keep this one.
+        (DialogId::Restart, DialogResult::Confirm(answer)) => app.answer_restart(*answer),
         // The share dialog closing, by Esc or Enter: the listener goes with
         // it. Nothing serves behind a closed dialog.
         (DialogId::Serve, DialogResult::None) => app.stop_serving(),

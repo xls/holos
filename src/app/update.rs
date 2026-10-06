@@ -486,10 +486,13 @@ impl App {
             ));
             return;
         }
+        // Armed before the command is written, while the binary on disk is
+        // still the one running: the watch compares against this.
+        self.watch_for_new_binary(std::time::Instant::now());
         self.to_shell(format!("{SELF_UPDATE_COMMAND}\n").as_bytes());
         self.command_was_run();
         self.message = Some(format!(
-            "running {SELF_UPDATE_COMMAND} in the console - restart hcmd when it finishes"
+            "running {SELF_UPDATE_COMMAND} in the console - hcmd offers a restart when it lands"
         ));
     }
 }

@@ -192,7 +192,10 @@ pub fn apply_vfs(app: &mut App, event: VfsEvent, caps_tx: &mpsc::Sender<CapsEven
 /// waits for whichever of them speaks first. It returns when the user quits,
 /// when `SIGTERM` or `SIGHUP` arrives, or when the input thread goes away -
 /// and saves the tabs on the way out.
-pub async fn event_loop() -> Result<()> {
+///
+/// Returns the binary to restart into when the user chose to restart after
+/// a self-update; the caller starts it once the terminal is back.
+pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
     // `config::load` has already resolved `ui.ascii_borders` against the
     // locale; it does the same on a `Ctrl+Alt+R` reload.
     let loaded = config::load();
@@ -458,6 +461,7 @@ pub async fn event_loop() -> Result<()> {
         // I/O, and this loop is the render thread.
         app.service_update_check(&update_tx);
         app.service_serve(&serve_tx);
+        app.service_exe_watch(std::time::Instant::now());
         app.service_localsend();
         app.service_file_info(&info_tx);
         app.service_links(&link_tx);
@@ -1065,7 +1069,7 @@ pub async fn event_loop() -> Result<()> {
         eprintln!("{BIN_NAME}: could not save tab state: {err}");
     }
 
-    Ok(())
+    Ok(app.restart_target().map(std::path::Path::to_path_buf))
 }
 
 /// Apply the input events already waiting, before the frame is drawn.

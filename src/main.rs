@@ -139,7 +139,28 @@ fn run() -> Result<()> {
     // Explicit as well as on Drop, so the terminal is back before any error is
     // printed.
     let _ = Term::restore();
-    result
+    // The runtime goes before a restart: its worker threads would otherwise
+    // be torn down mid-exec by the process image they no longer belong to.
+    drop(runtime);
+    match result? {
+        Some(binary) => restart(&binary),
+        None => Ok(()),
+    }
+}
+
+/// Become the new binary: same arguments, same terminal, same process id.
+///
+/// `exec` only comes back on failure, and then the old version simply ends -
+/// the update is on disk either way, so the next start runs it.
+fn restart(binary: &std::path::Path) -> Result<()> {
+    use std::os::unix::process::CommandExt as _;
+    let err = std::process::Command::new(binary)
+        .args(std::env::args_os().skip(1))
+        .exec();
+    Err(holoscommander::error::Error::msg(format!(
+        "could not restart into {}: {err} - start hcmd again to run the new version",
+        binary.display()
+    )))
 }
 
 #[cfg(test)]

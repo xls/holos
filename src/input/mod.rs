@@ -106,6 +106,8 @@ pub enum DialogId {
     /// A newer release, on a copy the npx installer put here: install it now
     /// with `npx holos-installer`, or skip until the next one.
     SelfUpdate,
+    /// The self-update replaced the binary: restart into it now, or later.
+    Restart,
     /// `Ctrl+N`, the share: where it is reachable and what was asked of it.
     Serve,
     /// `F9`, the menu bar.
@@ -226,6 +228,7 @@ impl DialogId {
             Self::DownloadLink => "download_link",
             Self::SendDevice => "send_device",
             Self::SelfUpdate => "self_update",
+            Self::Restart => "restart",
             Self::Serve => "serve",
             Self::Menu => "menu",
             Self::ContextMenu => "context_menu",

@@ -113,6 +113,7 @@ const DIALOG_ORDER: &[DialogId] = &[
     DialogId::Download,
     DialogId::DownloadLink,
     DialogId::SelfUpdate,
+    DialogId::Restart,
     DialogId::Serve,
     DialogId::SendDevice,
     DialogId::Menu,
@@ -1139,9 +1140,17 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
             "Shown when a newer release is found and this copy was installed\n\
              by npx holos-installer, which left a note saying so. Install types\n\
              `npx holos-installer` into the console so you can watch it run;\n\
-             restart hcmd when it finishes. Skip asks nothing more until the\n\
-             next release. A copy installed any other way never sees this -\n\
- it gets the status-line notice with the install command instead.",
+             when the new binary lands hcmd offers to restart into it. Skip\n\
+             asks nothing more until the next release. A copy installed any\n\
+             other way never sees this - it gets the status-line notice with\n\
+             the install command instead.",
+        ),
+        DialogId::Restart => (
+            "Restart into the update?",
+            "Shown when the self-update has replaced hcmd's binary. Restart\n\
+             quits the way a normal quit does - tabs saved - and starts the new\n\
+             version in the same terminal. Anything still running in the\n\
+             console ends. Later keeps this version until you quit.",
         ),
         DialogId::Menu => (
             "Menu bar",

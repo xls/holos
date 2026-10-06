@@ -30,6 +30,7 @@ pub mod reads;
 pub mod remote;
 pub mod rename;
 pub mod resize;
+pub mod restart;
 pub mod search;
 pub mod serve;
 pub mod settings;
@@ -688,6 +689,13 @@ pub struct App {
     pub pending_link_download: Option<String>,
     /// Set by the quit action; the event loop reads it.
     pub should_quit: bool,
+    /// The running binary, watched while a self-update may replace it.
+    pub exe_watch: Option<crate::app::restart::ExeWatch>,
+    /// The new binary a restart would start, once the watch has seen it.
+    pub restart_into: Option<std::path::PathBuf>,
+    /// Restart rather than plain quit: `main` starts [`App::restart_into`]
+    /// after the loop has ended and the terminal is restored.
+    pub restart_requested: bool,
     /// What the terminal's keyboard protocol has reported.
     pub keyboard: crate::input::Keyboard,
     /// What `Ctrl+C` / `Ctrl+X` remembered.
@@ -973,6 +981,9 @@ impl App {
             update_available: None,
             pending_link_download: None,
             should_quit: false,
+            exe_watch: None,
+            restart_into: None,
+            restart_requested: false,
             keyboard: crate::input::Keyboard::default(),
             clipboard: None,
             text_clipboard: None,
