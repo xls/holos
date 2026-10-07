@@ -2,6 +2,13 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.2
+
+- After a self-update replaces the binary, hcmd asks to restart into it: Restart quits as usual, tabs kept, and starts the new version in the same terminal; Later keeps this one.
+- `holos` starts hcmd too: the installers, the `.deb`, the `.rpm` and the Arch package all add it.
+- Arch Linux and Omarchy: `curl -fsSL https://raw.githubusercontent.com/xls/holos/main/install-arch.sh | sh` installs the latest release as a pacman package, checked against the published checksums.
+- README: a macOS tip for freeing the `Ctrl+F1`-`Ctrl+F6` keys macOS reserves.
+
 ## v0.17.1
 
 - With a quick search on, `Up` on the first match goes round to the last and `Down` on the last to the first, in both the jump and the filter search.

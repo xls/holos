@@ -42,6 +42,17 @@ Both installers choose the build for your platform and install the latest releas
 to `~/.local/bin`, without root. If `hcmd` is not found, add that directory to
 your `PATH`, or launch `~/.local/bin/hcmd` directly. `holos` starts it too.
 
+**Arch Linux and Omarchy:** install it as a pacman package instead, so pacman
+tracks it and `sudo pacman -R hcmd-bin` removes it. Run again to update.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/xls/holos/main/install-arch.sh | sh
+```
+
+The script downloads the latest release's package, checks it against the
+published `SHA256SUMS`, and installs it with `sudo pacman -U`. x86_64 only; on
+arm64 use the installer above.
+
 **Already installed?** Run either installer again to update, or use
 `npx holos-installer update`.
 
