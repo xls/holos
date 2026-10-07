@@ -34,8 +34,8 @@ hcmd
 Installed this way, hcmd keeps itself up to date: when a new release is out it
 offers to install it, and restarts into it when it lands.
 
-No Node.js? Use the shell installer; it installs the same build, and you rerun it
-to update:
+Or use the shell installer; it installs the same build, and you rerun it to
+update:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/xls/holos/main/install.sh | sh
