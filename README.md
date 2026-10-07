@@ -40,7 +40,7 @@ hcmd
 
 Both installers choose the build for your platform and install the latest release
 to `~/.local/bin`, without root. If `hcmd` is not found, add that directory to
-your `PATH`, or launch `~/.local/bin/hcmd` directly.
+your `PATH`, or launch `~/.local/bin/hcmd` directly. `holos` starts it too.
 
 **Already installed?** Run either installer again to update, or use
 `npx holos-installer update`.
@@ -92,12 +92,30 @@ selects the pinned toolchain automatically.
 
 ```sh
 git clone https://github.com/xls/holos
-cd hcmd
+cd holos
 cargo build --release
 ./target/release/hcmd
 ```
 
 The binary is self-contained apart from libc and libstdc++.
+
+</details>
+
+<details>
+<summary><strong>macOS tips</strong></summary>
+
+macOS reserves `Ctrl+F1` to `Ctrl+F6` for keyboard navigation, so hcmd never sees
+the column-sort keys. For the best experience, free them:
+
+1. Open **System Settings > Keyboard > Keyboard Shortcuts... > Keyboard**.
+2. Turn off the `Ctrl+F1` to `Ctrl+F6` entries ("Turn keyboard access on or off",
+   "Move focus to the menu bar", "...to the Dock", "...to active or next window",
+   "...to the window toolbar", "...to the floating window").
+3. Under **Function Keys**, turn on **Use F1, F2, etc. keys as standard function
+   keys**, so `F3` views and `F5` copies without holding `fn`.
+
+If you would rather keep the macOS shortcuts, `Ctrl+F7` to `Ctrl+F9` still sort
+by columns 2 to 4, and `Ctrl+1` to `Ctrl+9` sort by any column.
 
 </details>
 

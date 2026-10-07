@@ -13,6 +13,8 @@ trap 'rm -rf "$top"' EXIT
 mkdir -p "$top/BUILD" "$top/RPMS" "$top/SOURCES" "$top/SPECS" "$top/BUILDROOT"
 
 install -D -m 0755 "$bin" "$top/BUILD/usr/bin/hcmd"
+# `holos`: the same program under the project's name.
+ln -s hcmd "$top/BUILD/usr/bin/holos"
 install -D -m 0644 README.md "$top/BUILD/usr/share/doc/hcmd/README.md"
 install -D -m 0644 FEATURES.md "$top/BUILD/usr/share/doc/hcmd/FEATURES.md"
 mkdir -p "$top/BUILD/usr/share/hcmd/examples" "$top/BUILD/usr/share/hcmd/themes"

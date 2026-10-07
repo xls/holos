@@ -1,0 +1,28 @@
+# Maintainer: Thomas Rizos
+#
+# The AUR package: the release binaries, downloaded and checked against the
+# published checksums. Bumped per release with packaging/aur/update.sh.
+pkgname=hcmd-bin
+pkgver=0.17.1
+pkgrel=1
+pkgdesc="Holos Commander - a Total Commander alternative for the terminal, made for Omarchy"
+arch=('x86_64' 'aarch64')
+url="https://github.com/xls/holos"
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+provides=('hcmd' 'holos')
+conflicts=('hcmd')
+options=('!strip' '!debug')
+source_x86_64=("$url/releases/download/v$pkgver/hcmd-$pkgver-x86_64-unknown-linux-gnu.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/hcmd-$pkgver-aarch64-unknown-linux-gnu.tar.gz")
+sha256sums_x86_64=('dd2cf1b31ca932babe0f9cfd3e21645a272bfa4199a7c19b7c296763a8d1760f')
+sha256sums_aarch64=('43b5a4d50a8884c6b8a26abde8845f706b38fdce1e61c4a52c24405613af34c4')
+
+package() {
+  cd "$srcdir/hcmd-$pkgver-$CARCH-unknown-linux-gnu"
+  install -Dm0755 hcmd "$pkgdir/usr/bin/hcmd"
+  # The same program under the project's name.
+  ln -s hcmd "$pkgdir/usr/bin/holos"
+  install -Dm0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  find examples themes -type f -exec install -Dm0644 "{}" "$pkgdir/usr/share/hcmd/{}" \;
+}

@@ -243,6 +243,27 @@ async function main() {
     fs.copyFileSync(built, pending);
     fs.chmodSync(pending, 0o755);
     fs.renameSync(pending, path.join(INSTALL_DIR, "hcmd"));
+    // `holos` is the same program under the project's name. A link, so there
+    // is one binary to update; never over a real file somebody else put there.
+    try {
+      const alias = path.join(INSTALL_DIR, "holos");
+      let isLinkOrAbsent = true;
+      try {
+        isLinkOrAbsent = fs.lstatSync(alias).isSymbolicLink();
+      } catch (e) {
+        isLinkOrAbsent = true;
+      }
+      if (isLinkOrAbsent) {
+        try {
+          fs.unlinkSync(alias);
+        } catch (e) {
+          // Absent: nothing to replace.
+        }
+        fs.symlinkSync("hcmd", alias);
+      }
+    } catch (e) {
+      say(`warning: could not link holos (${e.message})`);
+    }
     // Leave a note that this installer put the binary here, with its own
     // version, so hcmd can offer `npx holos-installer` when a newer release is
     // out. Nothing reads it but hcmd; a copy installed any other way has none.

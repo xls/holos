@@ -22,6 +22,7 @@ source=()
 
 package() {
   install -Dm0755 "$startdir/hcmd" "$pkgdir/usr/bin/hcmd"
+  ln -s hcmd "$pkgdir/usr/bin/holos"
   install -Dm0644 "$startdir/README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -Dm0644 "$startdir/FEATURES.md" "$pkgdir/usr/share/doc/$pkgname/FEATURES.md"
   install -Dm0644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

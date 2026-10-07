@@ -171,6 +171,11 @@ answered ${FETCH_HTTP} for ${name}.tar.gz)" ;;
         || die "cannot write to $INSTALL_DIR"
     mv -f "$INSTALL_DIR/.hcmd.new" "$INSTALL_DIR/hcmd" \
         || die "cannot install into $INSTALL_DIR"
+    # `holos` is the same program under the project's name. A link, so there
+    # is one binary to update; never over a real file somebody else put there.
+    if [ ! -e "$INSTALL_DIR/holos" ] || [ -L "$INSTALL_DIR/holos" ]; then
+        ln -sfn hcmd "$INSTALL_DIR/holos" || say "warning: could not link holos"
+    fi
 
     # The 21 themes are compiled into the binary, so every one of them works
     # with no files at all. These are the editable copies: a theme is changed

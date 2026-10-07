@@ -36,6 +36,7 @@ check() {
 package() {
   cd "$srcdir/$pkgname-$pkgver"
   install -Dm0755 "target/release/hcmd" "$pkgdir/usr/bin/hcmd"
+  ln -s hcmd "$pkgdir/usr/bin/holos"
   install -Dm0644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -Dm0644 FEATURES.md "$pkgdir/usr/share/doc/$pkgname/FEATURES.md"
   install -Dm0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

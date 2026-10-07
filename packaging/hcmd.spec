@@ -14,6 +14,7 @@ as directories. Search runs in process; nothing is shelled out to.
 
 %files
 %{_bindir}/hcmd
+%{_bindir}/holos
 %{_datadir}/hcmd/examples
 %{_datadir}/hcmd/themes
 %doc %{_datadir}/doc/hcmd/README.md

@@ -22,6 +22,8 @@ mkdir -p "$root/DEBIAN" \
          "$root/usr/share/hcmd/examples"
 
 install -m 0755 "$bin" "$root/usr/bin/hcmd"
+# `holos`: the same program under the project's name.
+ln -s hcmd "$root/usr/bin/holos"
 install -m 0644 README.md FEATURES.md "$root/usr/share/doc/hcmd/"
 cp -r examples/. "$root/usr/share/hcmd/examples/"
 mkdir -p "$root/usr/share/hcmd/themes"

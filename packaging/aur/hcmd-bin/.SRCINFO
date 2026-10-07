@@ -1,0 +1,21 @@
+pkgbase = hcmd-bin
+	pkgdesc = Holos Commander - a Total Commander alternative for the terminal, made for Omarchy
+	pkgver = 0.17.1
+	pkgrel = 1
+	url = https://github.com/xls/holos
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	depends = gcc-libs
+	depends = glibc
+	provides = hcmd
+	provides = holos
+	conflicts = hcmd
+	options = !strip
+	options = !debug
+	source_x86_64 = https://github.com/xls/holos/releases/download/v0.17.1/hcmd-0.17.1-x86_64-unknown-linux-gnu.tar.gz
+	sha256sums_x86_64 = dd2cf1b31ca932babe0f9cfd3e21645a272bfa4199a7c19b7c296763a8d1760f
+	source_aarch64 = https://github.com/xls/holos/releases/download/v0.17.1/hcmd-0.17.1-aarch64-unknown-linux-gnu.tar.gz
+	sha256sums_aarch64 = 43b5a4d50a8884c6b8a26abde8845f706b38fdce1e61c4a52c24405613af34c4
+
+pkgname = hcmd-bin
