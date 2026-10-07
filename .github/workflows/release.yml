@@ -195,6 +195,11 @@ jobs:
           cd "$work" && sudo -u builder makepkg --noconfirm --nodeps
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp "$work"/*.pkg.tar.zst "$GITHUB_WORKSPACE/dist/"
+          # The same package under a name without the version, so one link -
+          # releases/latest/download/hcmd-bin-x86_64.pkg.tar.zst - always
+          # fetches the newest. install-arch.sh uses it.
+          cp "$work"/hcmd-bin-*-x86_64.pkg.tar.zst \
+             "$GITHUB_WORKSPACE/dist/hcmd-bin-x86_64.pkg.tar.zst"
           ls -la "$GITHUB_WORKSPACE/dist"/*.pkg.tar.zst
 
       - uses: actions/upload-artifact@v4
