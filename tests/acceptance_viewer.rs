@@ -862,7 +862,14 @@ fn criterion_1_f3_opens_a_text_file_and_esc_returns_the_cursor_where_it_was() {
     // The key bar under the status line names the mode keys and the function
     // keys, read off the keymap: what the number keys and F-keys do is on
     // screen rather than remembered.
-    let bar = s.keybar_text();
+    // Spaces collapsed: the bar is laid out in the panel bar's fixed-width
+    // slots, so how much padding sits between a key and its label depends on
+    // the width - what matters is which key is paired with which word.
+    let bar = s
+        .keybar_text()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     for want in [
         "1 Text", "2 Hex", "3 Doc", "F1 Help", "F3 Next", "F7 Find", "F9 Info",
     ] {

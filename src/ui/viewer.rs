@@ -266,8 +266,9 @@ pub fn keybar_items(app: &App) -> Vec<(String, &'static str)> {
         .collect()
 }
 
-/// Paint the viewer's key bar in the panel key bar's colours: each key, then
-/// its operation on a button, as many as the width holds.
+/// Paint the viewer's key bar exactly as the panel's is painted: the same
+/// equal, fixed-width slots from [`super::slot_layout`], in the same colours,
+/// so a button is the same width in both.
 pub fn draw_keybar(f: &mut Frame, app: &App, area: Rect) {
     if area.width == 0 || area.height == 0 {
         return;
@@ -279,22 +280,15 @@ pub fn draw_keybar(f: &mut Frame, app: &App, area: Rect) {
     let label = Style::new()
         .fg(super::color(app, app.theme.keybar.label_fg))
         .bg(super::color(app, app.theme.keybar.label_bg));
-    let width = usize::from(area.width);
-    let mut used = 0_usize;
+    let items = keybar_items(app);
+    let pairs: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
+    let ellipsis = crate::ui::text::Glyphs::new(app.config.ui.ascii_borders).ellipsis();
     let mut spans = Vec::new();
-    for (key, text) in keybar_items(app) {
-        let key_text = format!(" {key}");
-        let label_text = format!(" {text} ");
-        let need = key_text
-            .chars()
-            .count()
-            .saturating_add(label_text.chars().count());
-        if used.saturating_add(need) > width {
-            break;
-        }
-        used = used.saturating_add(need);
+    for (key_text, label_text) in super::slot_layout(&pairs, usize::from(area.width), ellipsis) {
         spans.push(Span::styled(key_text, number));
-        spans.push(Span::styled(label_text, label));
+        if !label_text.is_empty() {
+            spans.push(Span::styled(label_text, label));
+        }
     }
     f.render_widget(
         Paragraph::new(Line::from(spans)).style(Style::new().bg(bg)),
@@ -1519,6 +1513,33 @@ mod tests {
         let tiny = Rect::new(0, 0, 80, 3);
         assert_eq!(content_area(&a, tiny), tiny);
         assert_eq!(keybar_area(&a, tiny).height, 0);
+    }
+
+    #[test]
+    fn the_viewer_bar_uses_the_panel_bars_slot_widths() {
+        // The complaint: the panel's buttons are equal fixed-width slots, the
+        // viewer's were packed one after another. One layout for both now.
+        let a = app();
+        let items = keybar_items(&a);
+        let pairs: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
+        assert_eq!(pairs.len(), 10, "the bar has ten keys to lay out");
+        let panel_slot = |w: usize| {
+            crate::ui::keybar_slots(crate::input::KeyModifiers::NONE, w, "…")
+                .first()
+                .map(|(k, l)| crate::ui::text::width(k) + crate::ui::text::width(l))
+                .unwrap_or(0)
+        };
+        for width in [80, 120, 200] {
+            let slots = crate::ui::slot_layout(&pairs, width, "…");
+            assert_eq!(slots.len(), 10);
+            for (key, label) in &slots {
+                assert_eq!(
+                    crate::ui::text::width(key) + crate::ui::text::width(label),
+                    panel_slot(width),
+                    "at {width} columns every viewer slot is a panel slot"
+                );
+            }
+        }
     }
 
     #[test]

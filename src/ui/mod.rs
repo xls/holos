@@ -609,8 +609,23 @@ const KEYBAR_SLOT: usize = KEYBAR_KEY_FIELD + KEYBAR_LABEL_FIELD;
 /// Labels are at most [`KEYBAR_LABEL_MAX`] cells in every layer, so a slot is
 /// wide enough for its text at any size worth rendering, and cropping is a
 /// fallback rather than the normal case.
-fn keybar_slots(mods: KeyModifiers, width: usize, ellipsis: &str) -> Vec<(String, String)> {
-    let labels = keybar_labels(mods);
+pub(crate) fn keybar_slots(
+    mods: KeyModifiers,
+    width: usize,
+    ellipsis: &str,
+) -> Vec<(String, String)> {
+    slot_layout(&keybar_labels(mods), width, ellipsis)
+}
+
+/// `(key, label)` pairs laid out as the key bar's equal, fixed-width slots:
+/// each a padded key column and a padded label column, sized from the width
+/// alone. The panel bar and the viewer's bar both go through here, so a
+/// button is the same width wherever a key bar is drawn.
+pub(crate) fn slot_layout(
+    labels: &[(&str, &str)],
+    width: usize,
+    ellipsis: &str,
+) -> Vec<(String, String)> {
     let count = labels.len();
 
     // Two fixed columns per slot: the key, then the operation. Both are padded
