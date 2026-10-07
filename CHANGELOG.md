@@ -2,6 +2,11 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.3
+
+- The viewer's key bar uses the panel bar's equal, fixed-width slots, so its buttons line up the same way.
+- README: `npx holos-installer` is the recommended install, since hcmd can update itself through it.
+
 ## v0.17.2
 
 - After a self-update replaces the binary, hcmd asks to restart into it: Restart quits as usual, tabs kept, and starts the new version in the same terminal; Later keeps this one.
