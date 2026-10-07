@@ -24,17 +24,21 @@ panels, background jobs and a built-in shell to keep you moving.
 
 ## Install
 
-**Get started on Linux or macOS:**
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/xls/holos/main/install.sh | sh
-hcmd
-```
-
-Prefer Node.js?
+**Get started on Linux or macOS (recommended):**
 
 ```sh
 npx holos-installer
+hcmd
+```
+
+Installed this way, hcmd keeps itself up to date: when a new release is out it
+offers to install it, and restarts into it when it lands.
+
+No Node.js? Use the shell installer; it installs the same build, and you rerun it
+to update:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/xls/holos/main/install.sh | sh
 hcmd
 ```
 
