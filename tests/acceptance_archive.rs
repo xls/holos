@@ -2023,19 +2023,20 @@ fn quitting_with_an_archive_open_restores_the_terminal_and_clears_the_cache() {
         text.contains("payload.tar.gz#/") || text.contains("member-0")
     });
 
-    // The session cache exists now, and the dead session's is gone. Waited
-    // for, not assumed: the panel shows the archive's path the moment it
-    // navigates, and the backend makes its cache directory a beat later on
-    // the read thread - a slow runner checked in between.
-    s.wait_now("the session's cache directory", |_| {
-        caches(&t.temp())
-            .iter()
-            .any(|n| n != "hcmd-archive-4294967294-dead")
-    });
-    let live = caches(&t.temp());
-    assert!(
-        live.iter().any(|n| n != "hcmd-archive-4294967294-dead"),
-        "the archive session made no cache directory: {live:?}"
+    // The session cache lives while the index runs. Waited for, not assumed -
+    // the panel shows the archive's path the moment it navigates and the
+    // backend makes the cache a beat later - and a fast machine can finish the
+    // whole index, cache and all, before the first look; so the finished
+    // index ends the wait too. The sweep and the clean exit are asserted
+    // either way.
+    s.wait_now(
+        "the session's cache directory, or the finished index",
+        |s| {
+            caches(&t.temp())
+                .iter()
+                .any(|n| n != "hcmd-archive-4294967294-dead")
+                || s.text().contains("in 900 files")
+        },
     );
     assert!(
         !orphan.exists(),
@@ -2079,17 +2080,17 @@ fn sigterm_with_an_archive_open_restores_the_terminal_and_clears_the_cache() {
         let text = s.text();
         text.contains("payload.tar.gz#/") || text.contains("member-0")
     });
-    // Waited for, for the reason the test above gives: the path is on screen
-    // before the read thread has made the cache.
-    s.wait_now("the session's cache directory", |_| {
-        !caches(&t.temp()).is_empty()
-    });
-    assert!(
-        !caches(&t.temp()).is_empty(),
-        "the archive session made no cache directory"
+    // The cache lives while the index runs. Wait for it - or for the index to
+    // have finished, which a fast machine (the macOS runner) can do before
+    // the first look, taking the cache with it. Either way what this test
+    // promises is checked below unconditionally: the terminal comes back and
+    // no cache survives the signal.
+    s.wait_now(
+        "the session's cache directory, or the finished index",
+        |s| !caches(&t.temp()).is_empty() || s.text().contains("in 900 files"),
     );
 
-    // Mid-index, from outside.
+    // Mid-index when the machine is slow enough to catch it, from outside.
     let pid = s.child.process_id().expect("the child's pid");
     // SIGTERM is 15 on every platform this program runs on; `libc` is not a
     // dependency and `kill(1)` is a signal, not a computation -
