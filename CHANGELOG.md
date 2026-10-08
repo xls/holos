@@ -2,6 +2,11 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.4
+
+- The viewer moves with `h` `j` `k` `l`; `g` and `G` go to the top and end of the file, and `F5` and `F6` too, for a Mac where `Ctrl+Home` and `Ctrl+End` switch desktops. The key bar shows `F5 Top` and `F6 End`.
+- Hex grouping in the viewer moves from `g` to `b`.
+
 ## v0.17.3
 
 - The viewer's key bar uses the panel bar's equal, fixed-width slots, so its buttons line up the same way.
