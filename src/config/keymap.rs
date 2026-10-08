@@ -786,11 +786,44 @@ mod tests {
     }
 
     #[test]
+    fn the_viewer_moves_with_vim_keys_and_reaches_the_ends_without_ctrl_home() {
+        // On a Mac ctrl+home and ctrl+end switch desktops, so the ends of the
+        // file need keys macOS leaves alone; and h j k l, g and G for vim and
+        // less hands, none of them clashing with a viewer key.
+        let km = Keymap::builtin();
+        assert!(km.warnings.is_empty(), "builtin warns: {:#?}", km.warnings);
+        let viewer =
+            |code: KeyCode, mods: KeyModifiers| km.resolve(KeyContext::Viewer, press(code, mods));
+        for (code, mods, want) in [
+            (KeyCode::Char('h'), KeyModifiers::NONE, Action::CaretLeft),
+            (KeyCode::Char('j'), KeyModifiers::NONE, Action::CursorDown),
+            (KeyCode::Char('k'), KeyModifiers::NONE, Action::CursorUp),
+            (KeyCode::Char('l'), KeyModifiers::NONE, Action::CaretRight),
+            (KeyCode::Char('g'), KeyModifiers::NONE, Action::CursorTop),
+            (
+                KeyCode::Char('g'),
+                KeyModifiers::SHIFT,
+                Action::CursorBottom,
+            ),
+            (KeyCode::F(5), KeyModifiers::NONE, Action::CursorTop),
+            (KeyCode::F(6), KeyModifiers::NONE, Action::CursorBottom),
+            (KeyCode::Home, KeyModifiers::CONTROL, Action::CursorTop),
+            (KeyCode::End, KeyModifiers::CONTROL, Action::CursorBottom),
+        ] {
+            assert_eq!(
+                viewer(code, mods),
+                Resolution::Action(want),
+                "{code:?} {mods:?}"
+            );
+        }
+    }
+
+    #[test]
     fn the_viewer_hex_keys_resolve() {
         let km = Keymap::builtin();
         assert!(km.warnings.is_empty(), "builtin warns: {:#?}", km.warnings);
         for (ch, want) in [
-            ('g', Action::HexGroup),
+            ('b', Action::HexGroup),
             ('d', Action::HexFormat),
             ('e', Action::HexEndian),
             ('w', Action::ToggleWrap),

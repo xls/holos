@@ -2670,7 +2670,7 @@ fn a_selection_is_a_byte_range_and_outlives_every_view_change() {
 
     for (code, mods, what) in [
         (KeyCode::Char('2'), NONE, "hex mode"),
-        (KeyCode::Char('g'), NONE, "the hex grouping"),
+        (KeyCode::Char('b'), NONE, "the hex grouping"),
         (KeyCode::Char('d'), NONE, "the hex format"),
         (KeyCode::Char('e'), NONE, "the byte order"),
         (KeyCode::Char('1'), NONE, "text mode"),

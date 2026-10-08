@@ -214,13 +214,17 @@ pub fn keybar_area(app: &App, area: Rect) -> Rect {
 #[must_use]
 pub fn keybar_items(app: &App) -> Vec<(String, &'static str)> {
     use crate::input::{Action, KeyContext};
-    const ITEMS: [(Action, &str); 10] = [
+    const ITEMS: [(Action, &str); 12] = [
         (Action::ModeText, "Text"),
         (Action::ModeHex, "Hex"),
         (Action::ModeRender, "Doc"),
         (Action::Help, "Help"),
         (Action::ViewerReload, "Reload"),
         (Action::FindNext, "Next"),
+        // On a Mac ctrl+home and ctrl+end switch desktops, so the bar names
+        // the function keys that reach the ends of the file everywhere.
+        (Action::CursorTop, "Top"),
+        (Action::CursorBottom, "End"),
         (Action::QuickFind, "Find"),
         (Action::CycleEncoding, "Enc"),
         (Action::FileInfo, "Info"),
@@ -266,6 +270,35 @@ pub fn keybar_items(app: &App) -> Vec<(String, &'static str)> {
         .collect()
 }
 
+/// How many buttons the panel's key bar has: the viewer's buttons are sized
+/// as if it had this many too, so they are the panel's width whatever the
+/// viewer has to show.
+const PANEL_KEYBAR_BUTTONS: usize = 10;
+
+/// The viewer's buttons, laid out at the panel bar's button width. The
+/// viewer has more keys to show than the panel's ten, so on a terminal too
+/// narrow for all of them the last ones are left off rather than every
+/// button shrinking - they are ordered so that what goes first is the least
+/// missed (`Esc` closes whether it is shown or not).
+pub fn keybar_slots(app: &App, width: usize, ellipsis: &str) -> Vec<(String, String)> {
+    let items = keybar_items(app);
+    let pairs: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
+    // The panel's slot width at this terminal width, from the panel's own
+    // layout, so the two can never disagree.
+    let ten = vec![("", ""); PANEL_KEYBAR_BUTTONS];
+    let slot = super::slot_layout(&ten, width, ellipsis)
+        .first()
+        .map_or(0, |(k, l)| {
+            crate::ui::text::width(k) + crate::ui::text::width(l)
+        });
+    if slot == 0 {
+        return Vec::new();
+    }
+    let fit = (width / slot).min(pairs.len());
+    let shown = pairs.get(..fit).unwrap_or(&pairs);
+    super::slot_layout(shown, fit.saturating_mul(slot), ellipsis)
+}
+
 /// Paint the viewer's key bar exactly as the panel's is painted: the same
 /// equal, fixed-width slots from [`super::slot_layout`], in the same colours,
 /// so a button is the same width in both.
@@ -280,11 +313,9 @@ pub fn draw_keybar(f: &mut Frame, app: &App, area: Rect) {
     let label = Style::new()
         .fg(super::color(app, app.theme.keybar.label_fg))
         .bg(super::color(app, app.theme.keybar.label_bg));
-    let items = keybar_items(app);
-    let pairs: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
     let ellipsis = crate::ui::text::Glyphs::new(app.config.ui.ascii_borders).ellipsis();
     let mut spans = Vec::new();
-    for (key_text, label_text) in super::slot_layout(&pairs, usize::from(area.width), ellipsis) {
+    for (key_text, label_text) in keybar_slots(app, usize::from(area.width), ellipsis) {
         spans.push(Span::styled(key_text, number));
         if !label_text.is_empty() {
             spans.push(Span::styled(label_text, label));
@@ -1519,27 +1550,44 @@ mod tests {
     fn the_viewer_bar_uses_the_panel_bars_slot_widths() {
         // The complaint: the panel's buttons are equal fixed-width slots, the
         // viewer's were packed one after another. One layout for both now.
+        // Twelve keys against the panel's ten: the buttons keep the panel's
+        // width and the last ones are left off when the screen is too narrow.
         let a = app();
-        let items = keybar_items(&a);
-        let pairs: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
-        assert_eq!(pairs.len(), 10, "the bar has ten keys to lay out");
+        assert_eq!(keybar_items(&a).len(), 12, "the bar has twelve keys");
         let panel_slot = |w: usize| {
             crate::ui::keybar_slots(crate::input::KeyModifiers::NONE, w, "…")
                 .first()
                 .map(|(k, l)| crate::ui::text::width(k) + crate::ui::text::width(l))
                 .unwrap_or(0)
         };
-        for width in [80, 120, 200] {
-            let slots = crate::ui::slot_layout(&pairs, width, "…");
-            assert_eq!(slots.len(), 10);
+        for (width, shown) in [(80, 10), (120, 10), (130, 10), (160, 12), (200, 12)] {
+            let slots = keybar_slots(&a, width, "…");
+            assert_eq!(slots.len(), shown, "at {width} columns");
             for (key, label) in &slots {
                 assert_eq!(
                     crate::ui::text::width(key) + crate::ui::text::width(label),
                     panel_slot(width),
-                    "at {width} columns every viewer slot is a panel slot"
+                    "at {width} columns every viewer button is a panel button"
                 );
             }
         }
+        // What is left off first is Esc Close: Top and End are always shown.
+        let narrow: Vec<String> = keybar_slots(&a, 80, "…")
+            .into_iter()
+            .map(|(k, l)| format!("{}{}", k.trim(), l.trim_end()))
+            .collect();
+        assert!(
+            narrow
+                .iter()
+                .any(|s| s.starts_with("F5") && s.contains("Top")),
+            "{narrow:?}"
+        );
+        assert!(
+            narrow
+                .iter()
+                .any(|s| s.starts_with("F6") && s.contains("End")),
+            "{narrow:?}"
+        );
     }
 
     #[test]

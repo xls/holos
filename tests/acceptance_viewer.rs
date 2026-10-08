@@ -870,8 +870,10 @@ fn criterion_1_f3_opens_a_text_file_and_esc_returns_the_cursor_where_it_was() {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
+    // At this harness's width ten buttons fit, so the last two (F9 Info,
+    // Esc Close) are left off; the ends of the file are always there.
     for want in [
-        "1 Text", "2 Hex", "3 Doc", "F1 Help", "F3 Next", "F7 Find", "F9 Info",
+        "1 Text", "2 Hex", "3 Doc", "F1 Help", "F3 Next", "F5 Top", "F6 End", "F7 Find",
     ] {
         assert!(bar.contains(want), "the key bar names {want}, got {bar:?}");
     }

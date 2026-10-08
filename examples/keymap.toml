@@ -370,14 +370,18 @@ console_scroll_down = ["shift+pgdn"]
 # What you most often want after opening a file out of a search is the next hit
 # inside it, and with no pattern set f3 opens the find bar so it is never inert.
 close             = ["esc", "q"]
-cursor_up         = ["up"]
-cursor_down       = ["down"]
+# h j k l move as the arrows do, and g / G are the top and end of the file,
+# for vim and less hands; gg works too, it just goes to the top twice. f5 and
+# f6 are the same top and end on keys a Mac does not take for itself - there
+# ctrl+home and ctrl+end switch desktops.
+cursor_up         = ["up", "k"]
+cursor_down       = ["down", "j"]
 cursor_page_up    = ["pgup"]
 cursor_page_down  = ["pgdn"]
-caret_left        = ["left"]
-caret_right       = ["right"]
-cursor_top        = ["ctrl+home"]
-cursor_bottom     = ["ctrl+end"]
+caret_left        = ["left", "h"]
+caret_right       = ["right", "l"]
+cursor_top        = ["ctrl+home", "f5", "g"]
+cursor_bottom     = ["ctrl+end", "f6", "shift+g"]
 # ctrl with a movement scrolls the view and leaves the cursor and the selection
 # where they are. The next cursor move brings the view back.
 view_scroll_up        = ["ctrl+up"]
@@ -400,7 +404,8 @@ viewer_reload     = ["f2"]
 # is an independent question from base - hex digits have no sign - and cycling
 # all three through one key left two of the four combinations unreachable
 # without passing through a third.
-hex_group         = ["g"]
+# b for bytes per group: g is the top of the file, as in vim and less.
+hex_group         = ["b"]
 hex_format        = ["d"]
 hex_sign          = ["s"]
 hex_endian        = ["e"]
