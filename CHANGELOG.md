@@ -2,6 +2,10 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.5
+
+- `Ctrl+G` in the viewer takes a bare number as a line in text mode and a byte offset in hex mode, and its title says which; `:500`, `L500`, `50%`, `0x1f00`, `1f00h` and `$1f00` mean the same in both.
+
 ## v0.17.4
 
 - The viewer moves with `h` `j` `k` `l`; `g` and `G` go to the top and end of the file, and `F5` and `F6` too, for a Mac where `Ctrl+Home` and `Ctrl+End` switch desktops. The key bar shows `F5 Top` and `F6 End`.
