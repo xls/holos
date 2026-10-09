@@ -372,10 +372,18 @@ fn viewer_action(app: &mut App, action: Action, extend: Extend) -> Result<()> {
         // until this prompt learned to spell it. The prompt is a dialog over
         // the viewer, so the viewer keeps its position while the question is
         // asked.
+        // Titled for what a bare number means in this mode, so `500` is never
+        // a surprise: a line in text mode, a byte in hex.
+        let (title, label) = match super::dialogs::goto_plain_number(app) {
+            crate::viewer::hex::PlainNumber::Line => ("Go to line", "Line, 0x offset, or 50%:"),
+            crate::viewer::hex::PlainNumber::Offset => {
+                ("Go to offset", "Offset (0x…), 50% or :line:")
+            }
+        };
         app.push_dialog(Box::new(InputDialog::new(
             DialogId::GotoOffset,
-            "Go to offset",
-            "Offset (0x…), 50% or :line:",
+            title,
+            label,
             "",
         )));
         return Ok(());

@@ -256,7 +256,10 @@ pub fn dialog_answered(app: &mut App, id: DialogId, job: Option<JobId>, result: 
             // one. A file whose size is not yet known cannot be refused
             // against, so it is accepted (`resolve_goto` holds that rule).
             let len = app.focused_viewer().and_then(crate::viewer::Viewer::len);
-            match crate::viewer::hex::resolve_goto(raw, len) {
+            // A bare number means what the view is read by: a line in text
+            // mode, a byte in hex mode.
+            let plain = goto_plain_number(app);
+            match crate::viewer::hex::resolve_goto_as(raw, len, plain) {
                 Ok(target) => {
                     // A percentage and a line number are never refused against
                     // the size: the viewer answers both approximately while the
@@ -704,6 +707,18 @@ fn host_form_answered(app: &mut App, list: Vec<crate::remote::hosts::SavedHost>)
         dialog.set_hosts(list);
         if select_new {
             dialog.select(last);
+        }
+    }
+}
+
+/// What a bare number in the viewer's `Ctrl+G` prompt means: a line in text
+/// mode, which is read by line, and a byte offset in hex and the rendered
+/// view (whose lines are not the file's).
+pub(super) fn goto_plain_number(app: &App) -> crate::viewer::hex::PlainNumber {
+    match app.focused_viewer().map(crate::viewer::Viewer::mode) {
+        Some(crate::config::ViewerMode::Text) => crate::viewer::hex::PlainNumber::Line,
+        Some(crate::config::ViewerMode::Hex | crate::config::ViewerMode::Render) | None => {
+            crate::viewer::hex::PlainNumber::Offset
         }
     }
 }

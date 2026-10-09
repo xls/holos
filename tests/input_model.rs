@@ -2939,6 +2939,56 @@ fn f1_in_the_viewer_opens_the_viewers_own_help_page() {
 }
 
 #[test]
+fn ctrl_g_takes_a_bare_number_as_a_line_in_text_mode_and_an_offset_in_hex() {
+    // A bare number means what the view is read by: line 3 in text mode,
+    // byte 3 in hex. The prompt's title says which.
+    use holoscommander::config::ViewerMode;
+    use holoscommander::dialog::DialogResult;
+    use holoscommander::input::{DialogId, dialog_accepted};
+
+    // Ten-byte lines: line 3 (1-based) starts at byte 20.
+    let mut app = app_with(&["alpha"]);
+    open_viewer(&mut app, &"line-text\n".repeat(20));
+    press(&mut app, KeyCode::Char('g'), CTRL);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::GotoOffset));
+    assert_eq!(
+        app.top_dialog().map(holoscommander::dialog::Dialog::title),
+        Some("Go to line".to_string())
+    );
+    dialog_accepted(
+        &mut app,
+        DialogId::GotoOffset,
+        DialogResult::Text("3".to_string()),
+    );
+    assert_eq!(
+        app.viewer().map(holoscommander::viewer::Viewer::cursor),
+        Some(20),
+        "text mode: 3 is the third line"
+    );
+    // The answered prompt is still on the stack in this harness.
+    app.close_dialogs();
+
+    if let Some(v) = app.viewer_mut() {
+        v.set_mode(ViewerMode::Hex).expect("hex");
+    }
+    press(&mut app, KeyCode::Char('g'), CTRL);
+    assert_eq!(
+        app.top_dialog().map(holoscommander::dialog::Dialog::title),
+        Some("Go to offset".to_string())
+    );
+    dialog_accepted(
+        &mut app,
+        DialogId::GotoOffset,
+        DialogResult::Text("3".to_string()),
+    );
+    assert_eq!(
+        app.viewer().map(holoscommander::viewer::Viewer::cursor),
+        Some(3),
+        "hex mode: 3 is byte 3"
+    );
+}
+
+#[test]
 fn ctrl_g_in_the_viewer_asks_for_an_offset_and_accepts_0x() {
     // "`Ctrl+G` jumps to an offset, accepting `0x` notation."
     use holoscommander::config::ViewerMode;

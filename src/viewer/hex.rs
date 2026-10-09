@@ -655,7 +655,36 @@ pub enum GotoTarget {
 /// are answered approximately by the viewer while the index is still running,
 /// which is the rule the design states for exactly these two seeks.
 pub fn resolve_goto(input: &str, len: Option<u64>) -> std::result::Result<GotoTarget, GotoError> {
+    resolve_goto_as(input, len, PlainNumber::Offset)
+}
+
+/// What a bare number typed into `Ctrl+G` means: the thing the view shows.
+///
+/// Text mode is read by line, so `500` is line 500 there, as in an editor;
+/// hex mode is read by byte, so `500` is offset 500. The explicit forms -
+/// `:500`, `L500`, `50%`, `0x1f00`, `1f00h`, `$1f00` - mean the same in both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlainNumber {
+    /// A bare number is a byte offset.
+    Offset,
+    /// A bare decimal number is a 1-based line.
+    Line,
+}
+
+/// [`resolve_goto`], with a bare number read as `plain` says.
+pub fn resolve_goto_as(
+    input: &str,
+    len: Option<u64>,
+    plain: PlainNumber,
+) -> std::result::Result<GotoTarget, GotoError> {
     let raw = input.trim();
+    // A bare decimal in a view read by line is a line. Only a bare decimal:
+    // anything written as hex keeps meaning an offset everywhere.
+    if plain == PlainNumber::Line
+        && let Some(n) = parse_decimal(raw)
+    {
+        return Ok(GotoTarget::Line(n.saturating_sub(1)));
+    }
     // A percentage, written the way it is read out: `50%`.
     if let Some(body) = raw.strip_suffix('%')
         && let Some(n) = parse_offset(body)
@@ -1298,6 +1327,59 @@ mod tests {
         assert_eq!(resolve_goto(":1000", None), Ok(GotoTarget::Line(999)));
         assert!(resolve_goto(":0x10", None).is_err());
         assert!(resolve_goto("%", None).is_err());
+    }
+
+    #[test]
+    fn a_bare_number_is_a_line_in_text_mode_and_an_offset_in_hex() {
+        use PlainNumber::{Line, Offset};
+        // The point of the change: 500 in text mode is line 500, as in an
+        // editor; in hex mode it stays byte 500.
+        assert_eq!(
+            resolve_goto_as("500", Some(4096), Line),
+            Ok(GotoTarget::Line(499))
+        );
+        assert_eq!(
+            resolve_goto_as("500", Some(4096), Offset),
+            Ok(GotoTarget::Offset(500))
+        );
+        assert_eq!(
+            resolve_goto_as("1,000", None, Line),
+            Ok(GotoTarget::Line(999))
+        );
+        // A line is never refused against the byte size: it is not a byte.
+        assert_eq!(
+            resolve_goto_as("90000", Some(10), Line),
+            Ok(GotoTarget::Line(89999))
+        );
+        // The explicit forms mean the same in both modes.
+        for plain in [Line, Offset] {
+            assert_eq!(
+                resolve_goto_as(":20", None, plain),
+                Ok(GotoTarget::Line(19))
+            );
+            assert_eq!(
+                resolve_goto_as("L20", None, plain),
+                Ok(GotoTarget::Line(19))
+            );
+            assert_eq!(
+                resolve_goto_as("50%", None, plain),
+                Ok(GotoTarget::Percent(50))
+            );
+            assert_eq!(
+                resolve_goto_as("0x1f", None, plain),
+                Ok(GotoTarget::Offset(31))
+            );
+            assert_eq!(
+                resolve_goto_as("1fh", None, plain),
+                Ok(GotoTarget::Offset(31))
+            );
+            assert_eq!(
+                resolve_goto_as("$1f", None, plain),
+                Ok(GotoTarget::Offset(31))
+            );
+        }
+        // Rubbish is rubbish in both.
+        assert!(resolve_goto_as("banana", None, Line).is_err());
     }
 
     #[test]
