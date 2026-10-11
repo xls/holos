@@ -2,6 +2,12 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.6
+
+- `Ctrl+D` opens the directory hotlist again, as in Total Commander; the URL download prompt moves to `Alt+G`.
+- A `&` in a hotlist label makes the next letter its key: `&downloads` opens with `Ctrl+D`, `d`.
+- An action written as a section in `keymap.toml` (such as `[hotlist]`) gets a warning that shows the line to write under `[global]`.
+
 ## v0.17.5
 
 - `Ctrl+G` in the viewer takes a bare number as a line in text mode and a byte offset in hex mode, and its title says which; `:500`, `L500`, `50%`, `0x1f00`, `1f00h` and `$1f00` mean the same in both.
