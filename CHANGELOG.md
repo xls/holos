@@ -2,8 +2,9 @@
 
 Notable changes per release, one line each. Newest first.
 
-## v0.17.6
+## v0.17.7
 
+- Hotlist entries are edited in the popup: `F2` renames, `Del` or `F8` removes after a prompt, and `Shift+Up` / `Shift+Down` move an entry, as the popup's bottom border says.
 - `Ctrl+D` opens the directory hotlist again, as in Total Commander; the URL download prompt moves to `Alt+G`.
 - A `&` in a hotlist label makes the next letter its key: `&downloads` opens with `Ctrl+D`, `d`.
 - An action written as a section in `keymap.toml` (such as `[hotlist]`) gets a warning that shows the line to write under `[global]`.
