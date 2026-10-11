@@ -110,6 +110,8 @@ const DIALOG_ORDER: &[DialogId] = &[
     DialogId::Drive(Side::Right),
     DialogId::Hotlist,
     DialogId::HotlistAdd,
+    DialogId::HotlistRemove,
+    DialogId::HotlistRename,
     DialogId::Download,
     DialogId::DownloadLink,
     DialogId::SelfUpdate,
@@ -1070,10 +1072,12 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
         ),
         DialogId::Hotlist => (
             "Directory hotlist",
-            "Your favourites, on their own. They also sit below the drives in the\n\
-             Alt+W / Alt+E popup, under a separator, which is where they are\n\
-             reached by default - this standalone popup is unbound unless you\n\
-             give `hotlist` a key. Ctrl+Shift+D adds the directory you are in.\n\
+            "Ctrl+D. Your favourites, on their own; they also sit below the\n\
+             drives in the Alt+W / Alt+E popup, under a separator. A letter\n\
+             marked with & in a label (&downloads) jumps straight to it.\n\
+             Ctrl+Shift+D adds the directory you are in; on an entry, F2\n\
+             renames it, Del or F8 removes it, and Shift+Up / Shift+Down move\n\
+             it - the same in the Alt+W / Alt+E popup.\n\
              An entry whose path has gone is shown greyed with the reason rather\n\
  than dropped, and Enter on it refuses instead of navigating.",
         ),
@@ -1084,6 +1088,16 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
              list replaces that entry's label where it stands rather than\n\
              adding a second row, and the order is the order you put them in -\n\
  hotlist.toml is never sorted.",
+        ),
+        DialogId::HotlistRemove => (
+            "Remove from the hotlist",
+            "Del or F8 on a hotlist entry, in Ctrl+D or the drives popup. Only\n\
+             the bookmark goes; the directory is not touched.",
+        ),
+        DialogId::HotlistRename => (
+            "Rename a hotlist entry",
+            "F2 on a hotlist entry. A & before a letter makes it the entry's\n\
+             key, as in Total Commander; && is a literal &.",
         ),
         DialogId::Download => (
             "Download",

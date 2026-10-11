@@ -97,6 +97,10 @@ pub enum DialogId {
     /// `Ctrl+Shift+D`, the label prompt for the directory being added to the
     /// hotlist.
     HotlistAdd,
+    /// `Del` / `F8` on a hotlist row: remove it, or not.
+    HotlistRemove,
+    /// `F2` on a hotlist row: its new label.
+    HotlistRename,
     /// `Alt+G`, the URL prompt for a download.
     Download,
     /// `Enter` on a file link in the viewer: download it, or not.
@@ -224,6 +228,8 @@ impl DialogId {
             Self::Drive(Side::Right) => "drive_right",
             Self::Hotlist => "hotlist",
             Self::HotlistAdd => "hotlist_add",
+            Self::HotlistRemove => "hotlist_remove",
+            Self::HotlistRename => "hotlist_rename",
             Self::Download => "download",
             Self::DownloadLink => "download_link",
             Self::SendDevice => "send_device",

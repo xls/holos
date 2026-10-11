@@ -278,7 +278,7 @@ Uncomment a setting to override its default.
 - **`config.toml`**: application settings, with defaults documented.
 - **`keymap.toml`**: key bindings for each context.
 - **`themes/`**: your custom theme files.
-- **`hotlist.toml`**: directory bookmarks: `Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`. A `&` in a label makes the next letter its key, as in Total Commander.
+- **`hotlist.toml`**: directory bookmarks: `Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`. A `&` in a label makes the next letter its key, as in Total Commander; in the popup `F2` renames, `Del` removes and `Shift+Up/Down` reorders.
 - **`hosts.toml`**: saved remote connections.
 
 All 21 themes are built into the binary. To customise one, copy its installed

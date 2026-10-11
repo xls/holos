@@ -52,7 +52,9 @@ const HEADER: &str = "\
 # encoded.
 #
 # A & in a label makes the next letter its key, as in Total Commander:
-# label = \"&downloads\" opens with Ctrl+D, d. && is a literal &.
+# label = \"&downloads\" opens with Ctrl+D, d.
+# In the popup, F2 renames an entry, Del or F8 removes it, and Shift+Up /
+# Shift+Down move it. && is a literal &.
 #
 # Unlike config.toml and keymap.toml this file is not written commented out:
 # it holds no defaults to be frozen at, and a commented-out entry would
@@ -418,6 +420,13 @@ impl Hotlist {
     pub fn upsert(&mut self, label: String, path: String) -> bool {
         self.dirty = true;
         upsert(&mut self.entries, label, path)
+    }
+
+    /// Take the list as the popup left it after a remove, rename or move.
+    /// Dirty, unlike [`Self::adopt`]: memory is now ahead of the file.
+    pub fn replace(&mut self, entries: Vec<HotlistEntry>) {
+        self.entries = entries;
+        self.dirty = true;
     }
 
     /// The rows the popup draws, each already told whether its directory is

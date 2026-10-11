@@ -214,6 +214,8 @@ pub enum DialogResult {
     Secret(Box<SecretAnswer>),
     /// the host book was edited: the list as the dialog left it.
     Hosts(Vec<crate::remote::hosts::SavedHost>),
+    /// The hotlist was reordered in the popup: the list as it now stands.
+    Hotlist(Vec<crate::devices::hotlist::HotlistEntry>),
 }
 
 impl DialogResult {

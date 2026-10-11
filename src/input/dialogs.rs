@@ -567,6 +567,16 @@ pub fn dialog_answered(app: &mut App, id: DialogId, job: Option<JobId>, result: 
         // stops looking. Either way discovery leaves with the dialog.
         (DialogId::SendDevice, DialogResult::SendTo(choice)) => app.answer_send_device(choice),
         (DialogId::SendDevice, DialogResult::None) => app.stop_device_discovery(),
+        // The popup's own edits. A move hands back the whole list; the two
+        // prompts it pushes act on the entry under its cursor, which cannot
+        // have moved while they were up.
+        (DialogId::Hotlist | DialogId::Drive(_), DialogResult::Hotlist(entries)) => {
+            app.replace_hotlist(entries.clone());
+        }
+        (DialogId::HotlistRemove, DialogResult::Confirm(true)) => app.remove_hotlist_at_cursor(),
+        (DialogId::HotlistRename, DialogResult::Text(label)) => {
+            app.rename_hotlist_at_cursor(label.clone());
+        }
         // `Ctrl+Shift+D`'s label. The path is the active panel's, which has
         // not moved: the prompt is modal (see `open_hotlist_add`).
         (DialogId::HotlistAdd, DialogResult::Text(label)) => {

@@ -365,6 +365,58 @@ impl App {
             format!("{path}: added to the hotlist")
         });
     }
+
+    /// The hotlist as the popup left it after `Shift+Up` / `Shift+Down`.
+    pub fn replace_hotlist(&mut self, entries: Vec<HotlistEntry>) {
+        self.hotlist.replace(entries);
+    }
+
+    /// `Del` / `F8`'s answer: drop the entry under the popup's cursor, from
+    /// the popup and the file alike.
+    pub fn remove_hotlist_at_cursor(&mut self) {
+        let Some(popup) = self.drives_popup_mut() else {
+            return;
+        };
+        let Some(removed) = popup.remove_at_cursor() else {
+            return;
+        };
+        let entries = popup.hotlist_entries();
+        self.hotlist.replace(entries);
+        self.message = Some(format!("{}: removed from the hotlist", removed.path));
+        self.rearm_drives_poll();
+    }
+
+    /// `F2`'s answer: relabel the entry under the popup's cursor.
+    pub fn rename_hotlist_at_cursor(&mut self, label: String) {
+        let Some(popup) = self.drives_popup_mut() else {
+            return;
+        };
+        if !popup.rename_at_cursor(label) {
+            return;
+        }
+        let entries = popup.hotlist_entries();
+        self.hotlist.replace(entries);
+        self.rearm_drives_poll();
+    }
+
+    /// The drives popup, when it is the dialog on top - which it is again
+    /// once the prompt it pushed has been answered.
+    fn drives_popup_mut(&mut self) -> Option<&mut DrivesDialog> {
+        self.top_dialog_mut()?
+            .as_any_mut()?
+            .downcast_mut::<DrivesDialog>()
+    }
+
+    /// A poll that came due while a prompt covered the `Alt+F1` popup found
+    /// the popup gone and stopped; start it again now the popup is back.
+    fn rearm_drives_poll(&mut self) {
+        if matches!(
+            self.top_dialog().map(crate::dialog::Dialog::id),
+            Some(DialogId::Drive(_))
+        ) {
+            self.drives.arm(Instant::now());
+        }
+    }
 }
 
 #[cfg(test)]

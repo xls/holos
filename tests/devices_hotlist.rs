@@ -233,3 +233,97 @@ fn a_panel_that_is_not_local_is_refused_rather_than_stored() {
     let message = app.message.as_deref().unwrap_or_default();
     assert!(message.contains("local directories"), "{message}");
 }
+
+/// The hotlist's titles, in order.
+fn labels(app: &App) -> Vec<String> {
+    app.hotlist
+        .entries()
+        .iter()
+        .map(|e| e.label.clone())
+        .collect()
+}
+
+/// Shift+Up and Shift+Down move the entry under the cursor and the cursor
+/// with it; F2 renames it and Del or F8 removes it after a prompt. The same
+/// keys in the Ctrl+D popup and on the hotlist half of Alt+F1.
+#[test]
+fn the_popup_moves_renames_and_removes_hotlist_entries() {
+    let mut app = app();
+    app.add_to_hotlist("one".to_string(), "/one".to_string());
+    app.add_to_hotlist("two".to_string(), "/two".to_string());
+    app.add_to_hotlist("three".to_string(), "/three".to_string());
+    app.hotlist.adopt(app.hotlist.entries().to_vec());
+
+    press(&mut app, KeyCode::Char('d'), KeyModifiers::CONTROL);
+    let _ = app.service_drives();
+    assert_eq!(app.focus, Focus::Dialog(DialogId::Hotlist));
+
+    // Shift+Down twice carries "one" to the bottom; a third is a no-op.
+    press(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
+    assert_eq!(labels(&app), ["two", "one", "three"]);
+    assert!(app.hotlist.is_dirty(), "a move is written back");
+    press(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
+    press(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
+    assert_eq!(labels(&app), ["two", "three", "one"]);
+    // The cursor came along: Shift+Up moves "one" again, not another entry.
+    press(&mut app, KeyCode::Up, KeyModifiers::SHIFT);
+    assert_eq!(labels(&app), ["two", "one", "three"]);
+
+    // F2 on "one": the prompt opens with its label, and the answer relabels
+    // that entry where it stands.
+    press(&mut app, KeyCode::F(2), NONE);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::HotlistRename));
+    let _ = app.pop_answered_dialog();
+    dialog_accepted(
+        &mut app,
+        DialogId::HotlistRename,
+        DialogResult::Text("&first".to_string()),
+    );
+    assert_eq!(labels(&app), ["two", "&first", "three"]);
+    assert_eq!(
+        app.focus,
+        Focus::Dialog(DialogId::Hotlist),
+        "back on the popup"
+    );
+
+    // Del asks first; Cancel keeps the entry.
+    press(&mut app, KeyCode::Delete, NONE);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::HotlistRemove));
+    let _ = app.pop_answered_dialog();
+    dialog_accepted(
+        &mut app,
+        DialogId::HotlistRemove,
+        DialogResult::Confirm(false),
+    );
+    assert_eq!(labels(&app), ["two", "&first", "three"]);
+
+    // F8 and yes removes it - the bookmark, from memory and the file.
+    press(&mut app, KeyCode::F(8), NONE);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::HotlistRemove));
+    let _ = app.pop_answered_dialog();
+    dialog_accepted(
+        &mut app,
+        DialogId::HotlistRemove,
+        DialogResult::Confirm(true),
+    );
+    assert_eq!(labels(&app), ["two", "three"]);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::Hotlist));
+}
+
+/// The same keys on the hotlist half of the drives popup.
+#[test]
+fn the_drives_popup_edits_its_hotlist_half_too() {
+    let mut app = app();
+    app.add_to_hotlist("one".to_string(), "/one".to_string());
+    app.add_to_hotlist("two".to_string(), "/two".to_string());
+    app.hotlist.adopt(app.hotlist.entries().to_vec());
+
+    press(&mut app, KeyCode::F(1), ALT);
+    let _ = app.service_drives();
+    assert_eq!(app.focus, Focus::Dialog(DialogId::Drive(Side::Left)));
+    // No devices yet (the probe has not answered), so the cursor is on "one".
+    press(&mut app, KeyCode::Down, KeyModifiers::SHIFT);
+    assert_eq!(labels(&app), ["two", "one"]);
+    press(&mut app, KeyCode::Delete, NONE);
+    assert_eq!(app.focus, Focus::Dialog(DialogId::HotlistRemove));
+}

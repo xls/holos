@@ -36,12 +36,15 @@ use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 
 use crate::config::{QuickSearchCase, QuickSearchMode};
-use crate::devices::hotlist::HotlistRow;
+use crate::devices::hotlist::{HotlistEntry, HotlistRow};
 use crate::devices::{self, Device, MAX_VISIBLE_ROWS};
-use crate::dialog::{Dialog, DialogKey, DialogOutcome, DialogResult, DialogStyle, draw_text};
+use crate::dialog::{
+    ConfirmDialog, Dialog, DialogKey, DialogOutcome, DialogResult, DialogStyle, InputDialog,
+    draw_text,
+};
 use crate::input::quicksearch::quick_match;
 use crate::input::quicksearch::status_label;
-use crate::input::{DialogId, KeyCode};
+use crate::input::{DialogId, KeyCode, KeyModifiers};
 use crate::panel::Side;
 use crate::ui::dialog::{ellipsis, row as row_rect};
 use crate::ui::text::{self, Crop, Glyphs};
@@ -520,6 +523,117 @@ impl DrivesDialog {
         }
     }
 
+    /// The hotlist entry under the cursor, if the cursor is on one.
+    pub fn hotlist_entry_at_cursor(&self) -> Option<&HotlistEntry> {
+        match self.rows.get(self.cursor) {
+            Some(DriveRow::Hotlist(row)) => Some(&row.entry),
+            Some(DriveRow::Device(_) | DriveRow::Separator) | None => None,
+        }
+    }
+
+    /// The hotlist as the popup now holds it, in its order.
+    pub fn hotlist_entries(&self) -> Vec<HotlistEntry> {
+        self.rows
+            .iter()
+            .filter_map(|row| match row {
+                DriveRow::Hotlist(hot) => Some(hot.entry.clone()),
+                DriveRow::Device(_) | DriveRow::Separator => None,
+            })
+            .collect()
+    }
+
+    /// `F2`'s answer: relabel the entry under the cursor. The prompt is modal,
+    /// so the cursor is where it was when `F2` was pressed.
+    pub fn rename_at_cursor(&mut self, label: String) -> bool {
+        // An empty label would be a row with nothing to read and no letter.
+        if label.trim().is_empty() {
+            return false;
+        }
+        let Some(DriveRow::Hotlist(row)) = self.rows.get_mut(self.cursor) else {
+            return false;
+        };
+        row.entry.label = label;
+        true
+    }
+
+    /// `Del`'s answer: drop the entry under the cursor. The cursor stays at
+    /// the same height, on the entry that took its place, or the one above
+    /// when it was the last; a hotlist emptied out takes its separator with it.
+    pub fn remove_at_cursor(&mut self) -> Option<HotlistEntry> {
+        let Some(DriveRow::Hotlist(_)) = self.rows.get(self.cursor) else {
+            return None;
+        };
+        let removed = match self.rows.remove(self.cursor) {
+            DriveRow::Hotlist(row) => Some(row.entry),
+            DriveRow::Device(_) | DriveRow::Separator => None,
+        };
+        let any_left = self
+            .rows
+            .iter()
+            .any(|row| matches!(row, DriveRow::Hotlist(_)));
+        if !any_left {
+            self.rows.retain(|row| !matches!(row, DriveRow::Separator));
+        }
+        let last = self.rows.len().saturating_sub(1);
+        self.cursor = self.cursor.min(last);
+        if !self.rows.get(self.cursor).is_some_and(DriveRow::selectable) {
+            self.cursor = self.cursor.saturating_sub(1);
+        }
+        self.quick.clear();
+        self.refusal = None;
+        self.settle_cursor();
+        removed
+    }
+
+    /// `Shift+Up` / `Shift+Down`: swap the entry under the cursor with its
+    /// neighbour and keep the cursor on it. Only among hotlist rows - an entry
+    /// cannot be moved above the separator into the devices.
+    fn shift_entry(&mut self, up: bool) -> DialogOutcome {
+        let from = self.cursor;
+        let to = if up {
+            from.checked_sub(1)
+        } else {
+            from.checked_add(1)
+        };
+        let both_hotlist = matches!(self.rows.get(from), Some(DriveRow::Hotlist(_)))
+            && to.is_some_and(|to| matches!(self.rows.get(to), Some(DriveRow::Hotlist(_))));
+        let Some(to) = to.filter(|_| both_hotlist) else {
+            return DialogOutcome::Consumed;
+        };
+        self.rows.swap(from, to);
+        self.cursor = to;
+        self.quick.clear();
+        self.refusal = None;
+        DialogOutcome::Act(DialogResult::Hotlist(self.hotlist_entries()))
+    }
+
+    /// `Del` / `F8` and `F2` on a hotlist row: the prompt, pushed over the
+    /// popup. `None` on a device row, which has nothing to remove or rename.
+    fn edit_prompt(&self, code: KeyCode) -> Option<DialogOutcome> {
+        let entry = self.hotlist_entry_at_cursor()?;
+        let dialog: Box<dyn Dialog> = match code {
+            KeyCode::Delete | KeyCode::F(8) => Box::new(
+                ConfirmDialog::new(
+                    DialogId::HotlistRemove,
+                    "Remove from the hotlist",
+                    vec![
+                        format!("Remove {}?", entry.shown_label()),
+                        entry.path.clone(),
+                    ],
+                )
+                .with_buttons("Remove", "Cancel"),
+            ),
+            KeyCode::F(2) => Box::new(InputDialog::new(
+                DialogId::HotlistRename,
+                "Rename",
+                "Label:",
+                &entry.label,
+            )),
+            _ => return None,
+        };
+        Some(DialogOutcome::Push(dialog))
+    }
+
     /// How many rows the list itself gets in an interior of this height.
     const fn list_height(area: Rect) -> u16 {
         // One row of the interior is the status line; the borders are already
@@ -680,6 +794,19 @@ impl Dialog for DrivesDialog {
         if key.is_accept() {
             return self.accept();
         }
+        if key.press.mods.contains(KeyModifiers::SHIFT)
+            && matches!(key.press.code, KeyCode::Up | KeyCode::Down)
+        {
+            return self.shift_entry(key.press.code == KeyCode::Up);
+        }
+        if matches!(
+            key.press.code,
+            KeyCode::Delete | KeyCode::F(8) | KeyCode::F(2)
+        ) {
+            return self
+                .edit_prompt(key.press.code)
+                .unwrap_or(DialogOutcome::Consumed);
+        }
         match key.press.code {
             KeyCode::Up => {
                 self.step(true, 1);
@@ -799,11 +926,20 @@ impl Dialog for DrivesDialog {
                 (None, Some(fragment)) => {
                     draw_text(f, rect, &fragment, style.body(), style.ascii);
                 }
+                // On a hotlist entry the idle line says how to move it: F2 and
+                // Del work as they do in a panel, but nothing teaches this one,
+                // and the popup is narrow enough that one hint is all that fits.
+                (None, None) if self.hotlist_entry_at_cursor().is_some() => {
+                    draw_text(f, rect, HOTLIST_HINT, style.body(), style.ascii);
+                }
                 (None, None) => {}
             }
         }
     }
 }
+
+/// The status line under a hotlist entry when nothing else needs it.
+const HOTLIST_HINT: &str = "Shift+Up/Down moves the entry";
 
 impl std::fmt::Debug for DrivesDialog {
     /// By hand, because the row list is long and what a reader of a `Debug`
@@ -965,6 +1101,94 @@ mod tests {
         // The row shows the label without the marker.
         let text = DrivesDialog::row_text(&dialog.rows[0], 60, false);
         assert!(text.starts_with("home") && !text.contains('&'), "{text:?}");
+    }
+
+    #[test]
+    fn hotlist_edits_stay_on_the_hotlist_side_of_the_separator() {
+        let mut dialog = DrivesDialog::devices(
+            Side::Left,
+            vec![device("/"), device("/home")],
+            vec![live("one", "/one"), live("two", "/two")],
+        );
+        let names = |d: &DrivesDialog| -> Vec<String> {
+            d.hotlist_entries().into_iter().map(|e| e.label).collect()
+        };
+        let shift = |code| DialogKey::raw(KeyPress::new(code, KeyModifiers::SHIFT));
+
+        // On a device row nothing edits: no prompt, no move.
+        assert_eq!(dialog.cursor, 0);
+        for code in [KeyCode::Delete, KeyCode::F(8), KeyCode::F(2)] {
+            assert!(matches!(
+                dialog.handle_key(&key(code)),
+                DialogOutcome::Consumed
+            ));
+        }
+        assert!(matches!(
+            dialog.handle_key(&shift(KeyCode::Down)),
+            DialogOutcome::Consumed
+        ));
+        assert_eq!(
+            dialog.rows.len(),
+            5,
+            "two devices, the separator, two entries"
+        );
+
+        // The first entry cannot be lifted over the separator.
+        dialog.cursor = 3;
+        assert!(matches!(
+            dialog.handle_key(&shift(KeyCode::Up)),
+            DialogOutcome::Consumed
+        ));
+        assert_eq!(names(&dialog), ["one", "two"]);
+        assert_eq!(dialog.cursor, 3);
+
+        // A move hands the new order back and the cursor goes with the entry.
+        let DialogOutcome::Act(DialogResult::Hotlist(order)) =
+            dialog.handle_key(&shift(KeyCode::Down))
+        else {
+            panic!("a move is reported");
+        };
+        assert_eq!(order.len(), 2);
+        assert_eq!(names(&dialog), ["two", "one"]);
+        assert_eq!(
+            dialog.hotlist_entry_at_cursor().map(|e| e.label.as_str()),
+            Some("one")
+        );
+
+        // F2 and Del on an entry push their prompts.
+        assert!(matches!(
+            dialog.handle_key(&key(KeyCode::F(2))),
+            DialogOutcome::Push(_)
+        ));
+        assert!(matches!(
+            dialog.handle_key(&key(KeyCode::Delete)),
+            DialogOutcome::Push(_)
+        ));
+        assert!(
+            !dialog.rename_at_cursor("  ".to_string()),
+            "a blank label is refused"
+        );
+
+        // Removing the last entry steps the cursor up; removing the other
+        // takes the separator with it, and the cursor lands on a device.
+        assert_eq!(
+            dialog.remove_at_cursor().map(|e| e.label),
+            Some("one".to_string())
+        );
+        assert_eq!(
+            dialog.hotlist_entry_at_cursor().map(|e| e.label.as_str()),
+            Some("two")
+        );
+        assert_eq!(
+            dialog.remove_at_cursor().map(|e| e.label),
+            Some("two".to_string())
+        );
+        assert_eq!(dialog.rows.len(), 2, "no separator over an empty hotlist");
+        assert!(matches!(
+            dialog.rows.get(dialog.cursor),
+            Some(DriveRow::Device(_))
+        ));
+        assert_eq!(dialog.remove_at_cursor().map(|e| e.label), None);
     }
 
     #[test]
@@ -1223,6 +1447,39 @@ mod tests {
                 crate::dialog::draw(f, dialog, area, &style);
             })
             .expect("a frame");
+    }
+
+    /// The screen's text, one string per row.
+    fn screen(dialog: &DrivesDialog, w: u16, h: u16) -> String {
+        let backend = TestBackend::new(w, h);
+        let mut terminal = Terminal::new(backend).expect("a test terminal");
+        let style = DialogStyle::new(&Theme::blue(), ColorDepth::TrueColor, false);
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                crate::dialog::draw(f, dialog, area, &style);
+            })
+            .expect("a frame");
+        let buffer = terminal.backend().buffer();
+        (0..h)
+            .map(|y| (0..w).map(|x| buffer[(x, y)].symbol()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn a_hotlist_entry_under_the_cursor_says_how_to_move_it() {
+        // Shift+Up/Down is the one edit a panel does not teach, so the popup
+        // says it - on an entry, and not on a device, where it does nothing.
+        let mut dialog = DrivesDialog::devices(
+            Side::Left,
+            vec![device("/")],
+            vec![live("media", "/srv/media")],
+        );
+        assert!(!screen(&dialog, 100, 20).contains("Shift+Up/Down moves the entry"));
+        dialog.cursor = 2;
+        let shown = screen(&dialog, 100, 20);
+        assert!(shown.contains("Shift+Up/Down moves the entry"), "{shown}");
     }
 
     #[test]

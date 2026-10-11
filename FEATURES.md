@@ -15,7 +15,7 @@ stated, not hidden.
   panels. `Shift` with a movement key sweeps a range.
 - Directory sizes on demand (`Space`), reported exactly.
 - Hidden-files toggle, brief and full views, and bookmarked directories
-  (`Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`; `&` letters as in Total Commander).
+  (`Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`; `&` letters as in Total Commander; `F2`, `Del` and `Shift+Up/Down` edit it in place).
 - Quick view (`Ctrl+Q`): the opposite panel previews the file under the cursor,
   following it as you move.
 - Branch view (`Ctrl+B`): the whole tree below the current directory as one flat
