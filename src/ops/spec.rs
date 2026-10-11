@@ -185,7 +185,7 @@ pub struct JobOptions {
 /// What a [`JobKind::Download`] fetches, and how to treat a file already there.
 ///
 /// The one reusable shape every way of starting a download produces - the
-/// `Ctrl+D` prompt and the viewer's links alike - so the runner has one thing
+/// `Alt+G` prompt and the viewer's links alike - so the runner has one thing
 /// to read and the callers have one thing to build.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadRequest {

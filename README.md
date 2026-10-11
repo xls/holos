@@ -187,7 +187,7 @@ the host firewall is what usually stops the next machine - which firewall is on
 and the command that opens the port (`serve.port`, 8080 by default). Closing
 the dialog stops serving.
 
-**Fetch a URL (`Ctrl+D`).** Download into a per-session folder (`Alt+J`) as a
+**Fetch a URL (`Alt+G`).** Download into a per-session folder (`Alt+J`) as a
 background job with a progress bar; a partial file resumes.
 
 [![Native Local send](docs/localsend.png)](docs/localsend.png)
@@ -278,7 +278,7 @@ Uncomment a setting to override its default.
 - **`config.toml`**: application settings, with defaults documented.
 - **`keymap.toml`**: key bindings for each context.
 - **`themes/`**: your custom theme files.
-- **`hotlist.toml`**: directory bookmarks (`Ctrl+D`).
+- **`hotlist.toml`**: directory bookmarks: `Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`. A `&` in a label makes the next letter its key, as in Total Commander.
 - **`hosts.toml`**: saved remote connections.
 
 All 21 themes are built into the binary. To customise one, copy its installed

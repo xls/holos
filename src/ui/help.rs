@@ -1087,7 +1087,7 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
         ),
         DialogId::Download => (
             "Download",
-            "Ctrl+D. Paste a URL to fetch it into the downloads folder, which\n\
+            "Alt+G. Paste a URL to fetch it into the downloads folder, which\n\
              Alt+J opens. Redirects are followed; the transfer runs as a\n\
              background job with a progress bar and can be cancelled or sent to\n\
              the background like a copy. Nothing is opened or run - the file is\n\
@@ -1576,13 +1576,13 @@ mod tests {
         // the shipped default."
         let mut app = app();
         let before = keyboard_page(&app);
-        assert!(before.contains("Ctrl+D"), "{before}");
+        assert!(before.contains("Alt+G"), "{before}");
         app.keymap
             .overlay("[global]\ndownload = [\"alt+k\"]\n", "test.toml");
         let after = keyboard_page(&app);
         assert!(after.contains("Alt+K"), "{after}");
         assert!(
-            !after.contains("Ctrl+D  "),
+            !after.contains("Alt+G  "),
             "the old binding is gone: {after}"
         );
     }

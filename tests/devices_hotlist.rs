@@ -114,17 +114,20 @@ fn alt_f2_with_the_left_panel_active_changes_the_right_one() {
     assert_eq!(app.active_side, Side::Right);
 }
 
-/// The hotlist is no longer a key of its own: it lives in the drives popup
-/// under a divider, and `Ctrl+D` is the download prompt. So `Ctrl+D` opens
-/// that prompt and queues no drives request at all.
+/// github.com/xls/holos/issues/1: `Ctrl+D` is the hotlist again, as in Total
+/// Commander, and the download prompt moved to `Alt+G` ("get").
 #[test]
-fn ctrl_d_is_the_download_prompt_and_not_the_hotlist() {
-    let mut app = app();
-    app.set_focus(Focus::Panel(Side::Right));
+fn ctrl_d_is_the_hotlist_and_alt_g_the_download_prompt() {
+    let mut hotlist = app();
+    hotlist.set_focus(Focus::Panel(Side::Right));
+    press(&mut hotlist, KeyCode::Char('d'), KeyModifiers::CONTROL);
+    assert_eq!(hotlist.drives_pending(), Some(DrivesRequest::Hotlist));
 
-    press(&mut app, KeyCode::Char('d'), KeyModifiers::CONTROL);
-    assert_eq!(app.drives_pending(), None);
-    assert_eq!(app.focus, Focus::Dialog(DialogId::Download));
+    let mut download = app();
+    download.set_focus(Focus::Panel(Side::Right));
+    press(&mut download, KeyCode::Char('g'), ALT);
+    assert_eq!(download.drives_pending(), None);
+    assert_eq!(download.focus, Focus::Dialog(DialogId::Download));
 }
 
 /// **I6.** "`Ctrl+Shift+D` adds the active panel's directory,

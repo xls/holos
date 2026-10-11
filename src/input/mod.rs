@@ -97,7 +97,7 @@ pub enum DialogId {
     /// `Ctrl+Shift+D`, the label prompt for the directory being added to the
     /// hotlist.
     HotlistAdd,
-    /// `Ctrl+D`, the URL prompt for a download.
+    /// `Alt+G`, the URL prompt for a download.
     Download,
     /// `Enter` on a file link in the viewer: download it, or not.
     DownloadLink,
@@ -723,7 +723,7 @@ fn open_hotlist_add(app: &mut App) {
     )));
 }
 
-/// `Ctrl+D`: ask for a URL to download into the downloads folder.
+/// `Alt+G`: ask for a URL to download into the downloads folder.
 ///
 /// The prompt is the whole of the panel side: the answer goes to
 /// [`App::request_download`], which is the same entry the viewer's links reach,

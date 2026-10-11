@@ -91,12 +91,21 @@ impl DriveRow {
     ///
     /// A device's mount point without its leading `/`, so the own
     /// `us` -> `/usr` example works, and a hotlist entry's label, which is the
-    /// name the user gave it.
-    fn search_key(&self) -> &str {
+    /// name the user gave it - as shown, without its `&` marker, so `&home`
+    /// is found by typing `h`.
+    fn search_key(&self) -> std::borrow::Cow<'_, str> {
         match self {
-            Self::Device(device) => devices::search_key(&device.mount_point),
-            Self::Separator => "",
-            Self::Hotlist(row) => &row.entry.label,
+            Self::Device(device) => devices::search_key(&device.mount_point).into(),
+            Self::Separator => "".into(),
+            Self::Hotlist(row) => row.entry.shown_label().into(),
+        }
+    }
+
+    /// The `&` accelerator of a hotlist row, lower-cased.
+    fn accelerator(&self) -> Option<char> {
+        match self {
+            Self::Hotlist(row) => row.entry.accelerator().map(|(_, c)| c),
+            Self::Device(_) | Self::Separator => None,
         }
     }
 }
@@ -427,6 +436,38 @@ impl DrivesDialog {
         self.settle_cursor();
     }
 
+    /// A letter some hotlist entry has as its `&` accelerator: open that entry,
+    /// or, when several share it, step to the next of them. `None` when no
+    /// entry has the letter, and the key is quick search's.
+    fn accelerate(&mut self, ch: char) -> Option<DialogOutcome> {
+        let lower = ch.to_lowercase().next().unwrap_or(ch);
+        let hits: Vec<usize> = self
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row.accelerator() == Some(lower))
+            .map(|(i, _)| i)
+            .collect();
+        match hits.as_slice() {
+            [] => None,
+            [only] => {
+                self.cursor = *only;
+                Some(self.accept())
+            }
+            several => {
+                let next = several
+                    .iter()
+                    .copied()
+                    .find(|&i| i > self.cursor)
+                    .or_else(|| several.first().copied())
+                    .unwrap_or(self.cursor);
+                self.cursor = next;
+                self.refusal = None;
+                Some(DialogOutcome::Consumed)
+            }
+        }
+    }
+
     /// One keystroke of panel quick search over the rows.
     ///
     /// A character that matches nothing is **refused** rather than typed, so
@@ -436,7 +477,7 @@ impl DrivesDialog {
         let mut candidate = self.quick.clone();
         candidate.push(ch);
         let found = self.rows.iter().position(|row| {
-            row.selectable() && quick_match(row.search_key(), &candidate, self.mode, self.case)
+            row.selectable() && quick_match(&row.search_key(), &candidate, self.mode, self.case)
         });
         let Some(at) = found else {
             return;
@@ -511,8 +552,13 @@ impl DrivesDialog {
             DriveRow::Device(device) => devices::row(device, width, ascii),
             DriveRow::Separator => Glyphs::new(ascii).horizontal().repeat(width),
             DriveRow::Hotlist(entry) => {
-                let label =
-                    text::fit_left(&entry.entry.label, LABEL_COLUMN, Crop::End, ellipsis(ascii));
+                // Shown without its `&` marker; the render underlines the letter.
+                let label = text::fit_left(
+                    &entry.entry.shown_label(),
+                    LABEL_COLUMN,
+                    Crop::End,
+                    ellipsis(ascii),
+                );
                 let body = match &entry.missing {
                     Some(why) => format!("{label} {}  {why}", entry.entry.path),
                     None => format!("{label} {}", entry.entry.path),
@@ -666,6 +712,14 @@ impl Dialog for DrivesDialog {
             _ => {}
         }
         if let Some(ch) = key.text() {
+            // A hotlist entry's `&` letter opens it, as in Total Commander -
+            // only as the first key, so a quick search already under way keeps
+            // its letters.
+            if self.quick.is_empty()
+                && let Some(outcome) = self.accelerate(ch)
+            {
+                return outcome;
+            }
             // A character that matches nothing is swallowed rather than typed,
             // which is what the quick search does.
             self.quick_search(ch);
@@ -721,7 +775,16 @@ impl Dialog for DrivesDialog {
                 u16::try_from(width).unwrap_or(rect.width).min(rect.width),
                 1,
             );
-            draw_text(f, cropped, &text, line_style, style.ascii);
+            // A hotlist label's `&` letter is underlined where it sits, as a
+            // dialog's mnemonic is, so the key that opens it is on screen.
+            let accel = match row {
+                DriveRow::Hotlist(entry) => entry.entry.accelerator().map(|(at, _)| at),
+                DriveRow::Device(_) | DriveRow::Separator => None,
+            };
+            match accel.filter(|&at| at < LABEL_COLUMN && !style.ascii) {
+                Some(at) => draw_underlined_at(f, cropped, &text, at, line_style),
+                None => draw_text(f, cropped, &text, line_style, style.ascii),
+            }
         }
         self.draw_scrollbar(f, area, height, style);
 
@@ -753,6 +816,28 @@ impl std::fmt::Debug for DrivesDialog {
             .field("quick", &self.quick)
             .finish()
     }
+}
+
+/// `text` in `style`, with the character at index `at` underlined - a hotlist
+/// label's `&` letter. The row is already cut to its width.
+fn draw_underlined_at(
+    f: &mut Frame,
+    area: Rect,
+    text: &str,
+    at: usize,
+    style: ratatui::style::Style,
+) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::Paragraph;
+    let head: String = text.chars().take(at).collect();
+    let letter: String = text.chars().skip(at).take(1).collect();
+    let tail: String = text.chars().skip(at.saturating_add(1)).collect();
+    let line = Line::from(vec![
+        Span::styled(head, style),
+        Span::styled(letter, style.add_modifier(Modifier::UNDERLINED)),
+        Span::styled(tail, style),
+    ]);
+    f.render_widget(Paragraph::new(line).style(style), area);
 }
 
 #[cfg(test)]
@@ -821,6 +906,82 @@ mod tests {
 
     fn typed(ch: char) -> DialogKey {
         DialogKey::raw(KeyPress::new(KeyCode::Char(ch), KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn issue_2_an_ampersand_letter_opens_its_hotlist_entry_in_one_key() {
+        // github.com/xls/holos/issues/2: Total Commander's `&home` makes `h`
+        // open that entry. Shown without the marker, found by quick search
+        // on what is shown, and a shared letter steps between its entries.
+        let mut dialog = DrivesDialog::devices(
+            Side::Left,
+            vec![device("/"), device("/home")],
+            vec![
+                live("&home", "/home/foo"),
+                live("&downloads", "/home/foo/Downloads"),
+                live("&docs", "/home/foo/Documents"),
+                live("plain", "/srv/plain"),
+            ],
+        );
+        assert_eq!(
+            accepted(&dialog.handle_key(&typed('h'))).as_deref(),
+            Some("/home/foo"),
+            "h opens &home at once - not the /home device quick search would find"
+        );
+        assert_eq!(
+            accepted(&dialog.handle_key(&typed('H'))).as_deref(),
+            Some("/home/foo"),
+            "either case"
+        );
+        // d is shared: it steps between the two, opening neither.
+        assert!(matches!(
+            dialog.handle_key(&typed('d')),
+            DialogOutcome::Consumed
+        ));
+        let first = dialog.cursor;
+        assert!(matches!(
+            dialog.handle_key(&typed('d')),
+            DialogOutcome::Consumed
+        ));
+        assert_ne!(dialog.cursor, first, "the second d moves to the other");
+        assert_eq!(
+            accepted(&dialog.handle_key(&key(KeyCode::Enter))).as_deref(),
+            Some("/home/foo/Documents")
+        );
+        // A letter no entry marks is quick search, as before.
+        let mut dialog =
+            DrivesDialog::hotlist(vec![live("&home", "/home/foo"), live("plain", "/p")]);
+        assert!(matches!(
+            dialog.handle_key(&typed('p')),
+            DialogOutcome::Consumed
+        ));
+        assert_eq!(dialog.quick_buffer(), "p");
+        // And once a search is under way, h is just the next letter.
+        assert!(matches!(
+            dialog.handle_key(&typed('l')),
+            DialogOutcome::Consumed
+        ));
+        assert_eq!(dialog.quick_buffer(), "pl");
+        // The row shows the label without the marker.
+        let text = DrivesDialog::row_text(&dialog.rows[0], 60, false);
+        assert!(text.starts_with("home") && !text.contains('&'), "{text:?}");
+    }
+
+    #[test]
+    fn a_missing_hotlist_entry_refuses_through_its_letter_too() {
+        let mut dialog = DrivesDialog::hotlist(vec![gone("&old", "/mnt/old", "not plugged in")]);
+        assert!(matches!(
+            dialog.handle_key(&typed('o')),
+            DialogOutcome::Consumed
+        ));
+        assert!(
+            dialog
+                .refusal
+                .as_deref()
+                .is_some_and(|r| r.contains("not plugged in")),
+            "{:?}",
+            dialog.refusal
+        );
     }
 
     fn popup() -> DrivesDialog {

@@ -7,7 +7,7 @@
 //! a real directory, which is `F5` like anything else.
 //!
 //! The URL is turned into a job here, in the one place, so every way of asking
-//! for a download - the `Ctrl+D` prompt and the viewer's links - reaches the
+//! for a download - the `Alt+G` prompt and the viewer's links - reaches the
 //! same [`App::request_download`] and produces the same job.
 
 use std::path::{Path, PathBuf};
@@ -172,7 +172,7 @@ impl App {
     /// download, anything else opens in the browser.
     ///
     /// The viewer's whole part is to hand the target here - it does not know
-    /// about jobs, folders or browsers - so a link and the `Ctrl+D` prompt end
+    /// about jobs, folders or browsers - so a link and the `Alt+G` prompt end
     /// in the same [`App::request_download`]. Named for the web, because
     /// `request_link` is already the symlink job.
     pub fn follow_web_link(&mut self, target: &str) {

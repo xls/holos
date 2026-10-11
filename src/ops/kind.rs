@@ -103,7 +103,7 @@ pub enum JobKind {
     /// `Shift+R`: decode each source, resample it and write it into `dest`
     /// under the new format and the new name.
     Resize,
-    /// `Ctrl+D` and the viewer's links: fetch a URL into `dest`, streaming and
+    /// `Alt+G` and the viewer's links: fetch a URL into `dest`, streaming and
     /// resumable. Its source is the URL carried in [`JobOptions::download`], not
     /// a [`VfsPath`], so `sources` is empty like a [`JobKind::Mkdir`]'s.
     Download,

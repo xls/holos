@@ -640,6 +640,14 @@ impl Keymap {
                 None
             } else if let Some(c) = KeyContext::from_id(table_name) {
                 Some(c)
+            } else if Action::from_id(table_name).is_some() {
+                // `[hotlist]` with a key under it: an action written as a
+                // section. Say what was meant, with the line to write.
+                self.warnings.push(format!(
+                    "{file_label}: [{table_name}] is an action, not a section - \
+                     write `{table_name} = [\"ctrl+d\"]` (your key) under [global]"
+                ));
+                continue;
             } else {
                 self.warnings.push(format!(
                     "{file_label}: unknown section [{table_name}] (known: global, {})",
@@ -998,6 +1006,35 @@ mod tests {
         assert_eq!(
             km.resolve(KeyContext::Panel, ctrl_w),
             Resolution::Action(Action::TabClose)
+        );
+    }
+
+    #[test]
+    fn issue_1_ctrl_d_is_the_hotlist_and_a_hotlist_section_says_how() {
+        // github.com/xls/holos/issues/1: a Total Commander hand expects Ctrl+D
+        // to be the hotlist, and it is again; the download prompt is Alt+G.
+        let km = Keymap::builtin();
+        let ctrl_d = KeyPress::new(KeyCode::Char('d'), KeyModifiers::CONTROL);
+        let alt_g = KeyPress::new(KeyCode::Char('g'), KeyModifiers::ALT);
+        assert_eq!(
+            km.resolve(KeyContext::Panel, ctrl_d),
+            Resolution::Action(Action::Hotlist)
+        );
+        assert_eq!(
+            km.resolve(KeyContext::Panel, alt_g),
+            Resolution::Action(Action::Download)
+        );
+        // What the reporter wrote - the action as a section - is named as
+        // that, with the line that works.
+        let km = Keymap::load("[hotlist]\nkeys = [\"ctrl+d\"]\n", "keymap.toml");
+        let said = km.warnings.join("\n");
+        assert!(
+            said.contains("[hotlist] is an action, not a section"),
+            "{said}"
+        );
+        assert!(
+            said.contains("hotlist = [\"ctrl+d\"]") && said.contains("[global]"),
+            "{said}"
         );
     }
 

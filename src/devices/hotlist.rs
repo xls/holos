@@ -46,9 +46,13 @@ pub const HOTLIST_FILE: &str = "hotlist.toml";
 const HEADER: &str = "\
 # The directory hotlist, written by hcmd.
 #
-# Ctrl+Shift+D adds the active panel's directory; Ctrl+D opens the list. The
-# order is the order entries were added and is never sorted, because that order
-# is the one piece of information adding them encoded.
+# Ctrl+D opens the list and Ctrl+Shift+D adds the active panel's directory; it
+# is also below the drives in the Alt+F1 / Alt+F2 popup. The order is the order entries were added and is
+# never sorted, because that order is the one piece of information adding them
+# encoded.
+#
+# A & in a label makes the next letter its key, as in Total Commander:
+# label = \"&downloads\" opens with Ctrl+D, d. && is a literal &.
 #
 # Unlike config.toml and keymap.toml this file is not written commented out:
 # it holds no defaults to be frozen at, and a commented-out entry would
@@ -72,6 +76,55 @@ impl HotlistEntry {
     /// would refuse the whole file and the design wants a warning and the rest
     /// of the list.
     pub const KEYS: &'static [&'static str] = &["label", "path"];
+
+    /// The label as shown, with its `&` accelerator marker taken out.
+    #[must_use]
+    pub fn shown_label(&self) -> String {
+        parse_label(&self.label).0
+    }
+
+    /// The accelerator a `&` gives the label - `&home` is `h` - lower-cased,
+    /// with its character index in [`HotlistEntry::shown_label`].
+    #[must_use]
+    pub fn accelerator(&self) -> Option<(usize, char)> {
+        parse_label(&self.label).1
+    }
+}
+
+/// A label with Total Commander's `&` marker read out: the text to show, and
+/// the accelerator - the letter after the first single `&`, lower-cased, with
+/// its character index in that text. `&&` is a literal `&`, and a `&` with
+/// nothing usable after it (the end, a space) marks nothing.
+#[must_use]
+pub fn parse_label(label: &str) -> (String, Option<(usize, char)>) {
+    let mut shown = String::with_capacity(label.len());
+    let mut accel = None;
+    let mut shown_chars = 0_usize;
+    let mut chars = label.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '&' {
+            match chars.peek().copied() {
+                Some('&') => {
+                    chars.next();
+                    shown.push('&');
+                    shown_chars += 1;
+                }
+                Some(next) if accel.is_none() && next.is_alphanumeric() => {
+                    let lower = next.to_lowercase().next().unwrap_or(next);
+                    accel = Some((shown_chars, lower));
+                }
+                // A stray `&` before a space or at the end is shown as is.
+                Some(_) | None => {
+                    shown.push('&');
+                    shown_chars += 1;
+                }
+            }
+            continue;
+        }
+        shown.push(c);
+        shown_chars += 1;
+    }
+    (shown, accel)
 }
 
 /// An entry with the answer to "does it still exist" attached.
@@ -399,6 +452,45 @@ mod tests {
 label = "media"
 path  = "/srv/media"
 "#;
+
+    #[test]
+    fn an_ampersand_marks_the_next_letter_and_is_not_shown() {
+        // github.com/xls/holos/issues/2, Total Commander's convention.
+        assert_eq!(parse_label("&home"), ("home".into(), Some((0, 'h'))));
+        assert_eq!(
+            parse_label("Down&loads"),
+            ("Downloads".into(), Some((4, 'l')))
+        );
+        assert_eq!(
+            parse_label("&Media"),
+            ("Media".into(), Some((0, 'm'))),
+            "lowercased key"
+        );
+        assert_eq!(parse_label("plain"), ("plain".into(), None));
+        assert_eq!(
+            parse_label("R&&D"),
+            ("R&D".into(), None),
+            "&& is a literal &"
+        );
+        assert_eq!(
+            parse_label("a & b"),
+            ("a & b".into(), None),
+            "before a space"
+        );
+        assert_eq!(parse_label("tail&"), ("tail&".into(), None), "at the end");
+        assert_eq!(
+            parse_label("&one &two"),
+            ("one &two".into(), Some((0, 'o'))),
+            "only the first marks"
+        );
+        assert_eq!(parse_label("&&&x"), ("&x".into(), Some((1, 'x'))));
+        let entry = HotlistEntry {
+            label: "&docs".into(),
+            path: "/d".into(),
+        };
+        assert_eq!(entry.shown_label(), "docs");
+        assert_eq!(entry.accelerator(), Some((0, 'd')));
+    }
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
