@@ -781,6 +781,11 @@ impl Dialog for DrivesDialog {
         Some(self)
     }
 
+    fn footer(&self) -> Option<String> {
+        self.hotlist_entry_at_cursor()
+            .map(|_| HOTLIST_HINT.to_string())
+    }
+
     fn handle_key(&mut self, key: &DialogKey) -> DialogOutcome {
         if key.is_cancel() {
             // A running quick search takes the first `Esc`, exactly as it does
@@ -926,20 +931,15 @@ impl Dialog for DrivesDialog {
                 (None, Some(fragment)) => {
                     draw_text(f, rect, &fragment, style.body(), style.ascii);
                 }
-                // On a hotlist entry the idle line says how to move it: F2 and
-                // Del work as they do in a panel, but nothing teaches this one,
-                // and the popup is narrow enough that one hint is all that fits.
-                (None, None) if self.hotlist_entry_at_cursor().is_some() => {
-                    draw_text(f, rect, HOTLIST_HINT, style.body(), style.ascii);
-                }
                 (None, None) => {}
             }
         }
     }
 }
 
-/// The status line under a hotlist entry when nothing else needs it.
-const HOTLIST_HINT: &str = "Shift+Up/Down moves the entry";
+/// Set into the bottom border while the cursor is on a hotlist entry. F2 and
+/// Del work as they do in a panel, but nothing teaches this one.
+const HOTLIST_HINT: &str = "Shift+Up/Down moves entry";
 
 impl std::fmt::Debug for DrivesDialog {
     /// By hand, because the row list is long and what a reader of a `Debug`
@@ -1476,10 +1476,16 @@ mod tests {
             vec![device("/")],
             vec![live("media", "/srv/media")],
         );
-        assert!(!screen(&dialog, 100, 20).contains("Shift+Up/Down moves the entry"));
+        assert!(!screen(&dialog, 100, 20).contains("[Shift+Up/Down moves entry]"));
         dialog.cursor = 2;
         let shown = screen(&dialog, 100, 20);
-        assert!(shown.contains("Shift+Up/Down moves the entry"), "{shown}");
+        assert!(
+            shown
+                .lines()
+                .any(|line| line.contains('\u{2570}')
+                    && line.contains("[Shift+Up/Down moves entry]")),
+            "in the bottom border, not a row of the list:\n{shown}"
+        );
     }
 
     #[test]

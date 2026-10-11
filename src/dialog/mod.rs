@@ -493,6 +493,13 @@ pub trait Dialog: Send {
         None
     }
 
+    /// A short note set into the bottom border at the right, as
+    /// `──[Shift+Up/Down moves entry]`: a key the dialog's own rows do not
+    /// show. `None`, the default, leaves the border plain.
+    fn footer(&self) -> Option<String> {
+        None
+    }
+
     /// Which panel this dialog hangs under, when it is a dropdown rather than
     /// a centred box ("anchored under the target panel's
     /// header, so it is visually obvious which side it will act on").
@@ -844,6 +851,21 @@ pub fn draw(f: &mut Frame, dialog: &dyn Dialog, area: Rect, style: &DialogStyle)
                 .add_modifier(Modifier::BOLD),
         ))
         .style(Style::new().bg(style.bg));
+    // Dropped rather than cropped when the box is too narrow: half a key
+    // name tells nobody anything.
+    let footer = dialog.footer().filter(|note| {
+        Span::raw(note.as_str()).width().saturating_add(4) <= usize::from(rect.width)
+    });
+    let block = match footer {
+        Some(note) => block.title_bottom(
+            Line::from(Span::styled(
+                format!("[{note}]"),
+                Style::new().fg(style.border).bg(style.bg),
+            ))
+            .right_aligned(),
+        ),
+        None => block,
+    };
     let inner = block.inner(rect);
     f.render_widget(block, rect);
 
