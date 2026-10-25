@@ -719,9 +719,31 @@ fn entry_line(
     size_override: Option<&str>,
 ) -> String {
     let mut out = String::new();
+    let mut skip_next = false;
     for (i, col) in allocated.iter().enumerate() {
+        if std::mem::take(&mut skip_next) {
+            continue;
+        }
         if i > 0 {
             out.push(' ');
+        }
+        // A name runs on into an `ext` cell that has nothing to say - a
+        // directory, `..`, or a file with no extension - the way a spreadsheet
+        // cell spills into an empty neighbour.
+        if col.id == crate::panel::ColumnId::Name
+            && let Some(next) = allocated.get(i.saturating_add(1))
+            && next.id == crate::panel::ColumnId::Ext
+            && columns::cell_text(entry, next.id, row.cfg, row.ext_rendered, row.local_ids)
+                .is_empty()
+        {
+            let body = columns::cell_text(entry, col.id, row.cfg, row.ext_rendered, row.local_ids);
+            let wide = Allocated {
+                width: col.width.saturating_add(1).saturating_add(next.width),
+                ..*col
+            };
+            out.push_str(&columns::fit_cell(&body, wide, row.crop, row.g));
+            skip_next = true;
+            continue;
         }
         // The size cell is the one that is formatted against its own width:
         // an exact count that does not fit is cropped into a wrong number,
@@ -1118,7 +1140,51 @@ pub fn counts_text(
 
 #[cfg(test)]
 mod tests {
-    use super::walk_indicator;
+    use super::{RowFormat, entry_line, walk_indicator};
+    use crate::panel::{Allocated, ColumnId};
+    use crate::ui::text::{Crop, Glyphs};
+
+    /// A name, a five-cell ext and a size column, as one row of text.
+    fn line(entry: &Entry) -> String {
+        let cfg = Config::default().panel;
+        let col = |id, width| Allocated {
+            id,
+            width,
+            align: crate::ui::columns::align_of(id),
+        };
+        let allocated = [
+            col(ColumnId::Name, 10),
+            col(ColumnId::Ext, 5),
+            col(ColumnId::Size, 7),
+        ];
+        let row = RowFormat {
+            cfg: &cfg,
+            crop: Crop::End,
+            g: Glyphs::new(true),
+            ext_rendered: true,
+            local_ids: false,
+        };
+        entry_line(entry, &allocated, &row, None, None)
+    }
+
+    #[test]
+    fn a_name_with_no_extension_runs_on_into_the_ext_column() {
+        // A folder never has an extension, so its name may use the ext
+        // column's cells - like a spreadsheet cell spilling into an empty one.
+        let dir = line(&Entry::dir("Documents-2026"));
+        assert!(dir.starts_with("[Documents-2026] "), "{dir:?}");
+        // A file with no extension, the same.
+        let bare = line(&Entry::file("LICENSE-APACHE2"));
+        assert!(bare.starts_with("LICENSE-APACHE2 "), "{bare:?}");
+        // One with an extension keeps its own column, and its name crops.
+        let file = line(&Entry::file("presentation.pptx"));
+        assert!(file.starts_with("present"), "{file:?}");
+        assert!(file.contains("pptx"), "{file:?}");
+        assert!(!file.contains("presentation"), "{file:?}");
+        // The row is the same width either way, so the size column lines up.
+        assert_eq!(dir.chars().count(), file.chars().count());
+        assert_eq!(bare.chars().count(), file.chars().count());
+    }
     use crate::config::SizeWalkStyle;
     use crate::ui::text::width as display_width;
     use std::time::Duration;
