@@ -75,7 +75,8 @@ detect_target() {
             # smaller. Prefer glibc when this is demonstrably a glibc system.
             if have ldd && ldd --version 2>&1 | grep -qi musl; then
                 libc=musl
-            elif [ -e /lib/ld-linux-x86-64.so.2 ] || [ -e /lib/ld-linux-aarch64.so.1 ]; then
+            elif [ -e /lib/ld-linux-x86-64.so.2 ] || [ -e /lib/ld-linux-aarch64.so.1 ] ||
+                [ -e /lib64/ld-linux-x86-64.so.2 ]; then
                 libc=gnu
             else
                 libc=musl
