@@ -30,6 +30,7 @@ pub mod console;
 pub mod dialog;
 pub mod filetype;
 pub mod help;
+pub mod image;
 pub mod panelview;
 pub mod quickview;
 pub mod text;

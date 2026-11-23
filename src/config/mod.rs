@@ -34,8 +34,8 @@ use std::path::{Path, PathBuf};
 pub use config::{
     ArchiveConfig, AttrStyle, ColorDepthSetting, ColumnsConfig, Config, ConsoleConfig,
     DevicesConfig, DigitKeys, EditorConfig, Endian, ExecuteIn, ExecutePolicy, FiletypeRule,
-    HexConfig, HexFormat, HexGroup, HighlightEngine, KeyboardProtocol, Matcher, ModeMatch,
-    NameTruncate, OpenConfig, OpenHandler, OpsConfig, PanelConfig, QuickSearchCase,
+    GraphicsSetting, HexConfig, HexFormat, HexGroup, HighlightEngine, KeyboardProtocol, Matcher,
+    ModeMatch, NameTruncate, OpenConfig, OpenHandler, OpsConfig, PanelConfig, QuickSearchCase,
     QuickSearchMode, RemoteConfig, SearchConfig, SearchEngine, SizeWalkStyle, SwitchOnRun, TabBar,
     TerminalConfig, UiConfig, ViewerConfig, ViewerEncodingConfig, ViewerHighlightConfig,
     ViewerMode, ViewerRenderConfig,

@@ -636,6 +636,13 @@ pub struct App {
     /// How many colours this session can show. Detected once at
     /// startup; `TrueColor` in a headless app so tests are deterministic.
     pub color_depth: ColorDepth,
+    /// How the viewer draws a picture this session: decided once at startup
+    /// from `terminal.graphics` and what the terminal answered. Half blocks
+    /// in a headless app, which a test can read back from the buffer.
+    pub graphics: crate::term::graphics::Protocol,
+    /// One cell's size in pixels, measured before each frame. What a picture
+    /// is fitted with when it is drawn in real pixels.
+    pub cell_px: (u16, u16),
     /// The left panel.
     pub left: Panel,
     /// The right panel.
@@ -969,6 +976,8 @@ impl App {
             keymap,
             theme,
             color_depth: ColorDepth::TrueColor,
+            graphics: crate::term::graphics::Protocol::Halfblocks,
+            cell_px: crate::term::graphics::FALLBACK_CELL,
             left: Panel::new(Side::Left, start.clone()),
             right: Panel::new(Side::Right, start),
             focus: Focus::Panel(Side::Left),

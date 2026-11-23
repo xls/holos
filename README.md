@@ -203,7 +203,8 @@ receive.
 
 Press **F3** for a streaming viewer that starts displaying a file without waiting
 to load it all into memory. Read large logs, inspect highlighted source, or view
-**JSON, HTML and Markdown** in document mode.
+**JSON, HTML and Markdown** in document mode. Pictures are drawn in the terminal,
+in real pixels where it supports them.
 
 Switch to hex for the bytes behind the file. Built-in binary templates describe
 **109 formats**, exposing details such as image dimensions and executable

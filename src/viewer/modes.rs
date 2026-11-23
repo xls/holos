@@ -270,6 +270,8 @@ impl Viewer {
         // taken against a file that has since changed.
         self.cancel.store(true, Ordering::Relaxed);
         self.idx = LineIndex::new(self.chunk);
+        // A picture is decoded again from the file as it now is.
+        self.forget_image();
 
         let shrank = now.is_some_and(|n| was >= n);
         if shrank {

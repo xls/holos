@@ -253,6 +253,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
     // `HCMD_PANIC_TEST` is set.
     term::panic_test_hook(term::PANIC_STAGE_START);
     app.keyboard.enhanced = term.enhanced_keyboard();
+    app.graphics = term.graphics();
     app.warnings.extend(term.warnings().iter().cloned());
     if app.config.ui.mouse {
         term.set_mouse(true)?;
@@ -334,6 +335,12 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
     // pool and the built viewer arrives here, the same shape as its own index
     // scan.
     let (view_tx, mut view_rx) = mpsc::channel::<OpenedViewer>(4);
+    // A picture in mode 3 is read whole and decoded on the blocking pool, and
+    // arrives here; the same shape as the line index, one message a picture.
+    let (image_tx, mut image_rx) = mpsc::channel::<viewer::image::ImageBatch>(4);
+    // What picture has been sent to the terminal, so a frame that shows the
+    // same one sends nothing.
+    let mut painter = term::graphics_encode::Painter::new();
     // While that open is in flight the keys the user types belong to the
     // viewer they asked for, not to the panel behind it: `F3` `F7` `hello` is
     // one gesture, and letting the two keys after `F3` reach the panel would
@@ -756,7 +763,37 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
         // caret. It needs `&mut`, so it happens here rather than
         // inside the renderer.
         app.refresh_console_block();
+
+        // The picture in mode 3: decoded once off this thread, scaled to the
+        // cells it gets when that size changes, and - for kitty, sixel and
+        // iTerm2 - sent after the frame by the painter.
+        if app.graphics != term::graphics::Protocol::Off
+            && let Some(job) = app.viewer_mut().and_then(viewer::Viewer::take_image_job)
+        {
+            let tx = image_tx.clone();
+            tokio::task::spawn_blocking(move || {
+                let _ = tx.blocking_send(viewer::image::decode(job));
+            });
+        }
+        if app.graphics.is_pixels() {
+            app.cell_px = term::graphics::cell_pixels();
+        }
+        if let Some((w, h)) = ui::image::scaled_size(&app, area)
+            && let Some(v) = app.viewer_mut()
+        {
+            v.prepare_scaled(w, h);
+        }
+        let placement = ui::image::placement(&app, area);
+        if painter.must_clear(placement.as_ref()) {
+            term.terminal().clear()?;
+        }
         term.terminal().draw(|f| ui::draw(f, &app))?;
+        painter.paint(
+            &mut std::io::stdout(),
+            placement,
+            app.viewer().and_then(viewer::Viewer::scaled_picture),
+            ui::image::background(&app),
+        )?;
 
         // How long to wait for something to happen. Ordinarily the escape
         // sequence timeout below; shorter while the `auto` is
@@ -984,6 +1021,9 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
                     apply_input(&mut app, &mut term, event, false, &mut held_keys)?;
                 }
             }
+            Some(batch) = image_rx.recv() => {
+                app.apply_image_batch(&batch);
+            }
             Some(batch) = index_rx.recv() => {
                 // A batch whose viewer has been closed is dropped inside
                 // `apply_index_batch`.
@@ -1047,6 +1087,8 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
             break;
         }
     }
+    // A kitty picture is the terminal's to keep until it is told otherwise.
+    let _ = painter.paint(&mut std::io::stdout(), None, None, [0, 0, 0]);
 
     // Every open viewer goes with the session: a `Viewer`'s `Drop` sets its
     // scan's cancel flag, and a blocking-pool thread still reading a 40 GB file

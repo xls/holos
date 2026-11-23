@@ -1062,6 +1062,10 @@ pub struct ViewerConfig {
     /// > the pending file is replaced rather than queued, and only the one the
     /// > cursor rests on for `viewer.quick_view_delay` is opened.
     pub quick_view_delay: Timeout,
+    /// The largest image mode 3 decodes to show as a picture. A picture
+    /// cannot be streamed - the last row is at the end of the file - so a
+    /// bigger one opens as its summary instead, and the status line says so.
+    pub image_max_size: ByteSize,
 }
 
 impl Default for ViewerConfig {
@@ -1082,6 +1086,7 @@ impl Default for ViewerConfig {
             render: ViewerRenderConfig::default(),
             copy_max: ByteSize::mib(1),
             quick_view_delay: Timeout(std::time::Duration::from_millis(150)),
+            image_max_size: ByteSize::mib(64),
         }
     }
 }
@@ -1366,6 +1371,25 @@ pub enum ColorDepthSetting {
     Ansi16,
 }
 
+/// `[terminal] graphics`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GraphicsSetting {
+    /// Ask the terminal, and fall back to half blocks.
+    #[default]
+    Auto,
+    /// The kitty graphics protocol (kitty, Ghostty, WezTerm).
+    Kitty,
+    /// DEC sixel (foot, xterm, mlterm, WezTerm, Windows Terminal).
+    Sixel,
+    /// iTerm2's inline images (iTerm2, WezTerm).
+    Iterm2,
+    /// Two pixels per character cell, coloured: any colour terminal.
+    Halfblocks,
+    /// No pictures: an image opens as its summary.
+    Off,
+}
+
 /// `[serve]`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ConfigDoc)]
 #[serde(default)]
@@ -1393,6 +1417,10 @@ pub struct TerminalConfig {
     /// wrong in both directions. Same reasoning as `ui.ascii_borders`: detect,
     /// but let the file win.
     pub colors: ColorDepthSetting,
+    /// How pictures are drawn in the viewer: "auto" asks the terminal, then
+    /// "kitty", "sixel" or "iterm2" for its graphics protocol, "halfblocks"
+    /// for coloured character cells that work anywhere, "off" for none.
+    pub graphics: GraphicsSetting,
     /// Raw escape sequences bound to logical keys, for terminals that need it.
     /// Skipped from the generated file and shown only as the commented example
     /// below, since the default holds no entries to render.

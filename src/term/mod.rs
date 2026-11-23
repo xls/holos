@@ -17,6 +17,8 @@
 //! * Enable bracketed paste, so a pasted path is not read as navigation keys.
 
 pub mod events;
+pub mod graphics;
+pub mod graphics_encode;
 // the clipboard sequence. Here rather than in the viewer because it
 // is a fact about the terminal, and because it must be the only place in the
 // crate that writes one.
@@ -271,6 +273,8 @@ pub struct Term {
     enhanced: bool,
     decoder: SequenceDecoder,
     warnings: Vec<String>,
+    /// How the viewer draws pictures, decided below.
+    graphics: graphics::Protocol,
     /// Whether `ui.mouse` asked for mouse reporting.
     ///
     /// Held here rather than read back from the terminal - nothing can be read
@@ -291,7 +295,10 @@ impl Term {
         enable_raw_mode()?;
         RAW.store(true, Ordering::SeqCst);
 
-        let enhanced = detect_enhanced_keyboard(cfg);
+        let (graphics, silent) = detect_graphics(cfg);
+        // A terminal that did not answer Device Attributes will not answer the
+        // keyboard query either, and waiting it out twice doubles the start.
+        let enhanced = !silent && detect_enhanced_keyboard(cfg);
 
         let mut out = stdout();
         execute!(out, EnterAlternateScreen)?;
@@ -327,6 +334,7 @@ impl Term {
             enhanced: enhanced && PUSHED_FLAGS.load(Ordering::SeqCst),
             decoder: SequenceDecoder::new(map),
             warnings,
+            graphics,
             mouse: false,
         })
     }
@@ -343,6 +351,11 @@ impl Term {
     /// bindings the terminal cannot deliver in the help screen.
     pub const fn enhanced_keyboard(&self) -> bool {
         self.enhanced
+    }
+
+    /// How the viewer draws pictures this session.
+    pub const fn graphics(&self) -> graphics::Protocol {
+        self.graphics
     }
 
     /// Warnings from parsing `[terminal.sequences]`, for `App::warnings`.
@@ -871,6 +884,35 @@ pub fn detect_enhanced_keyboard(cfg: &TerminalConfig) -> bool {
             query_enhanced_keyboard(query_timeout())
         }
     }
+}
+
+/// Decide how pictures are drawn, and say whether the terminal was asked and
+/// answered nothing.
+///
+/// The terminal is asked only where nothing cheaper decided: the setting is
+/// `auto`, the environment names no terminal we know, and the keyboard is
+/// being detected too - a forced keyboard protocol says this terminal's
+/// replies are not to be waited for, and a test harness's bare pty is exactly
+/// that.
+fn detect_graphics(cfg: &TerminalConfig) -> (graphics::Protocol, bool) {
+    let setting = graphics::setting(cfg.graphics);
+    let guess = graphics::from_env(|key| std::env::var(key).ok());
+    let keyboard_auto =
+        protocol_from_env().unwrap_or(cfg.keyboard_protocol) == KeyboardProtocol::Auto;
+    let ask = setting == crate::config::GraphicsSetting::Auto
+        && guess.is_none()
+        && keyboard_auto
+        && stdout().is_terminal()
+        && std::io::stdin().is_terminal();
+    let answer = if ask {
+        graphics::query(query_timeout())
+    } else {
+        None
+    };
+    (
+        graphics::resolve(setting, guess, answer),
+        ask && answer.is_none(),
+    )
 }
 
 /// The bound on the capability query, from the environment or [`QUERY_TIMEOUT`].

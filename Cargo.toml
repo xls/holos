@@ -23,6 +23,10 @@ path = "src/main.rs"
 [dependencies]
 ratatui              = "0.30.2"
 crossterm            = "0.29.0"
+# Already in the tree under crossterm. Used directly for one thing: reading
+# the terminal's reply to the graphics query with a read timeout, before
+# crossterm's own reader exists (src/term/graphics.rs).
+rustix               = { version = "1.1.6", features = ["termios"] }
 tokio                = { version = "1.53.1", features = ["rt-multi-thread", "macros", "fs", "sync", "time", "signal"] }
 serde                = { version = "1.0.229", features = ["derive"] }
 toml                 = "1.1.4"

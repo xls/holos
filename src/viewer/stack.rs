@@ -146,6 +146,11 @@ impl Stack {
         self.open.iter_mut().any(|v| v.apply_index(batch))
     }
 
+    /// Offer a decoded picture to every viewer; the one that asked takes it.
+    pub fn apply_image(&mut self, batch: &crate::viewer::image::ImageBatch) -> bool {
+        self.open.iter_mut().any(|v| v.apply_image(batch))
+    }
+
     /// Offer one match-counter batch to every viewer, for the same reason and
     /// dropped just as quietly.
     pub fn apply_find(&mut self, batch: &crate::viewer::find::FindBatch) -> bool {

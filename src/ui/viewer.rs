@@ -66,7 +66,11 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     if title.height > 0 {
         draw_title(f, app, viewer, title);
     }
-    draw_body(f, app, viewer, body);
+    if super::image::shows_picture(app, viewer) {
+        super::image::draw(f, app, viewer, body);
+    } else {
+        draw_body(f, app, viewer, body);
+    }
     // Over the body rather than beside it. The event loop lays the rows out
     // for `body_cols`, so taking columns for a panel here would reflow every
     // row behind it and move the bytes the panel is reading.
@@ -363,6 +367,11 @@ pub fn body_cols_for(viewer: &Viewer, area: Rect) -> u16 {
 /// unpleasant but usable and keeps its numbers; the rule is for the terminals
 /// where the gutter would be most of the screen.
 const MIN_TEXT_COLS: u16 = 8;
+
+/// The body of a viewer drawn in `area`: what [`split`] gives it.
+pub(crate) fn body_rect(area: Rect) -> Rect {
+    split(area).1
+}
 
 fn split(area: Rect) -> (Rect, Rect, Rect) {
     if area.height <= 2 {

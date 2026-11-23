@@ -277,6 +277,9 @@ struct Launch {
     /// `panel.cursor_bg` for whatever theme this child will load, because the
     /// panel's cursor bar is a background and is read back out of the cells.
     cursor_bg: (u8, u8, u8),
+    /// Answer every Device Attributes request with this, as a real terminal
+    /// would, and let the child ask: the keyboard protocol is left on `auto`.
+    answer: Option<&'static [u8]>,
 }
 
 impl Launch {
@@ -288,7 +291,14 @@ impl Launch {
             config: NO_CONSOLE.to_string(),
             theme_name: "blue".to_string(),
             cursor_bg: paint::CURSOR_FOCUSED,
+            answer: None,
         }
+    }
+
+    /// Be a terminal that answers its queries with `reply`.
+    fn answering(mut self, reply: &'static [u8]) -> Self {
+        self.answer = Some(reply);
+        self
     }
 
     /// Append to the throwaway `config.toml` the child is given.
@@ -326,6 +336,8 @@ struct Session {
     /// screen however well the product does it. The raw stream is where that
     /// claim can be checked.
     raw: Vec<u8>,
+    /// See [`Launch::answering`].
+    answer: Option<&'static [u8]>,
 }
 
 impl Session {
@@ -337,6 +349,7 @@ impl Session {
             config,
             theme_name,
             cursor_bg,
+            answer,
         } = launch;
 
         let home = std::env::temp_dir().join(format!(
@@ -368,7 +381,9 @@ impl Session {
         cmd.env("LC_ALL", "en_US.UTF-8");
         // a bare pty answers no capability query, and `Ctrl+G`
         // only exists as a distinguishable sequence under the Kitty protocol.
-        cmd.env("HCMD_KEYBOARD_PROTOCOL", "enhanced");
+        if answer.is_none() {
+            cmd.env("HCMD_KEYBOARD_PROTOCOL", "enhanced");
+        }
         // No network at startup: the update check would phone GitHub every
         // launch and could paint a notice over a status bar an assertion reads.
         cmd.env("HCMD_NO_UPDATE_CHECK", "1");
@@ -403,6 +418,7 @@ impl Session {
             home,
             cursor_bg,
             raw: Vec::new(),
+            answer,
         }
     }
 
@@ -418,6 +434,13 @@ impl Session {
             }
             match self.rx.recv_timeout(left) {
                 Ok(chunk) => {
+                    if let Some(reply) = self.answer {
+                        let asked = chunk.windows(3).filter(|w| *w == b"\x1b[c").count();
+                        for _ in 0..asked {
+                            self.writer.write_all(reply).unwrap();
+                        }
+                        self.writer.flush().unwrap();
+                    }
                     self.raw.extend_from_slice(&chunk);
                     self.parser.process(&chunk);
                 }
@@ -2416,5 +2439,110 @@ fn selection_9_ctrl_shift_c_copies_exactly_the_reading_on_the_status_line() {
         ),
         "what is shown is what is copied:\n{}",
         s.dump()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Pictures: mode 3 on an image draws it
+// ---------------------------------------------------------------------------
+
+/// A 64 x 32 PNG, red on the left and green on the right.
+fn picture_png() -> Vec<u8> {
+    let img = image::RgbaImage::from_fn(64, 32, |x, _| {
+        if x < 32 {
+            image::Rgba([255, 0, 0, 255])
+        } else {
+            image::Rgba([0, 255, 0, 255])
+        }
+    });
+    let mut out = Vec::new();
+    image::ImageEncoder::write_image(
+        image::codecs::png::PngEncoder::new(&mut out),
+        img.as_raw(),
+        64,
+        32,
+        image::ExtendedColorType::Rgba8,
+    )
+    .unwrap();
+    out
+}
+
+/// Open `shot.png` under `[terminal] graphics = <protocol>` and wait for the
+/// summary's status label, which says mode 3 has the file.
+fn open_picture(tag: &str, protocol: &str) -> (Tree, Session) {
+    let tree = Tree::new(tag);
+    tree.file("shot.png", picture_png());
+    let launch = Launch::new(100, 30, tree.path())
+        .config(&format!("[terminal]\ngraphics = \"{protocol}\"\n"));
+    let mut s = Session::start(launch);
+    open(&mut s, &[], "shot", "shot.png");
+    (tree, s)
+}
+
+#[test]
+fn picture_1_half_blocks_draw_a_png_in_its_own_colours() {
+    let (_tree, mut s) = open_picture("pic1", "halfblocks");
+    s.wait("the picture to be drawn", |s| s.body_text().contains('▀'));
+    let row = s.body_row_of("▀").expect("a row of the picture");
+    let cells: Vec<char> = s.row_cells(row).chars().collect();
+    let first = cells.iter().position(|c| *c == '▀').unwrap() as u16;
+    let last = cells.iter().rposition(|c| *c == '▀').unwrap() as u16;
+    assert_eq!(s.fg(row, first), Some(rgb((255, 0, 0))), "{}", s.dump());
+    assert_eq!(s.fg(row, last), Some(rgb((0, 255, 0))), "{}", s.dump());
+
+    s.press(b"i", "the facts box", |s| s.text().contains("File size"));
+    assert!(s.text().contains("64 x 32"), "{}", s.dump());
+}
+
+#[test]
+fn picture_2_kitty_sends_the_picture_and_deletes_it_on_the_way_out() {
+    let (_tree, mut s) = open_picture("pic2", "kitty");
+    s.wait("the kitty picture", |s| {
+        s.raw_since(0).contains("\x1b_Ga=T,f=32")
+    });
+    assert!(
+        !s.body_text().contains('▀'),
+        "pixels, not half blocks:\n{}",
+        s.dump()
+    );
+    let mark = s.raw.len();
+    s.press(keys::ESC, "the panel to come back", |s| {
+        !s.viewing("shot.png")
+    });
+    s.wait("the picture to be deleted", |s| {
+        s.raw_since(mark).contains("\x1b_Ga=d,d=I")
+    });
+}
+
+#[test]
+fn picture_3_sixel_sends_a_sixel_and_only_once() {
+    let (_tree, mut s) = open_picture("pic3", "sixel");
+    s.wait("the sixel", |s| s.raw_since(0).contains("\x1bPq\""));
+    let mark = s.raw.len();
+    // A key that changes nothing about the picture: the cursor moves in the
+    // hidden summary.
+    s.send(keys::DOWN);
+    s.settle();
+    assert!(
+        !s.raw_since(mark).contains("\x1bPq"),
+        "an unchanged picture is not sent again"
+    );
+}
+
+#[test]
+fn picture_4_a_terminal_that_says_sixel_gets_sixel_without_being_told() {
+    // Device Attributes listing `4`, as foot and xterm answer.
+    let tree = Tree::new("pic4");
+    tree.file("shot.png", picture_png());
+    let launch = Launch::new(100, 30, tree.path()).answering(b"\x1b[?62;4;22c");
+    let mut s = Session::start(launch);
+    open(&mut s, &[], "shot", "shot.png");
+    s.wait("a sixel, chosen by asking", |s| {
+        s.raw_since(0).contains("\x1bPq\"")
+    });
+    assert!(
+        s.raw_since(0)
+            .contains("\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c"),
+        "it asked"
     );
 }

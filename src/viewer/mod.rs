@@ -53,6 +53,7 @@ pub mod find;
 pub mod find_render;
 pub mod hex;
 pub mod highlight;
+pub mod image;
 pub mod index;
 pub mod inspect;
 pub mod layout;
@@ -597,6 +598,12 @@ pub struct Viewer {
     /// `viewer.render.max_size`, taken at open so the mode switch does not
     /// need the configuration.
     render_max: u64,
+    /// The picture mode 3 shows for an image, once it has been asked for.
+    image: Option<image::ImageState>,
+    /// The picture at the size it is drawn. See [`Viewer::prepare_scaled`].
+    image_scaled: Option<::image::RgbaImage>,
+    /// `viewer.image_max_size`.
+    image_max: u64,
     /// Where [`Viewer::template`] came from, which is what keeps an
     /// automatic match from overwriting a choice.
     template_pick: TemplatePick,
@@ -917,6 +924,9 @@ impl Viewer {
             render_cursor: 0,
             render_note: None,
             render_max: cfg.render.max_size.bytes(),
+            image: None,
+            image_scaled: None,
+            image_max: cfg.image_max_size.bytes(),
             template_pick: TemplatePick::Unset,
             template_match_pending: mode == ViewerMode::Hex,
             field_reading: None,

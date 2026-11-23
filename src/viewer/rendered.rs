@@ -197,6 +197,22 @@ impl Viewer {
             self.install_render(document);
             return Ok(());
         }
+        // A picture no template describes - TGA has no magic to match - still
+        // has mode 3: the picture is drawn over this, and this one line is
+        // what shows where it cannot be.
+        let name = self.format_name();
+        if super::image::is_image_name(&name) {
+            let ext = name.rsplit_once('.').map_or("", |(_, ext)| ext);
+            self.install_render(Rendered {
+                kind: RenderKind::Summary,
+                label: super::image::FALLBACK_LABEL.to_string(),
+                lines: vec![super::render::RenderLine::plain(format!(
+                    "{} image",
+                    ext.to_ascii_uppercase()
+                ))],
+            });
+            return Ok(());
+        }
         Err(refusal)
     }
 

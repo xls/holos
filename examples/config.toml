@@ -247,6 +247,10 @@ copy_max = "1MiB"
 # the pending file is replaced rather than queued, and only the one the
 # cursor rests on for `viewer.quick_view_delay` is opened.
 quick_view_delay = "150ms"
+# The largest image mode 3 decodes to show as a picture. A picture
+# cannot be streamed - the last row is at the end of the file - so a
+# bigger one opens as its summary instead, and the status line says so.
+image_max_size = "64MiB"
 
 # How the bytes are grouped and read in hex mode. A dump of single bytes
 # is the right view for a string table and the wrong one for an array of
@@ -431,6 +435,10 @@ keyboard_protocol = "auto"
 # wrong in both directions. Same reasoning as `ui.ascii_borders`: detect,
 # but let the file win.
 colors = "auto"
+# How pictures are drawn in the viewer: "auto" asks the terminal, then
+# "kitty", "sixel" or "iterm2" for its graphics protocol, "halfblocks"
+# for coloured character cells that work anywhere, "off" for none.
+graphics = "auto"
 
 # Bind a raw escape sequence to a logical key for terminals that need it.
 # [terminal.sequences]
