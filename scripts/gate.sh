@@ -186,8 +186,15 @@ binary-size)
   # admitted by name). It is a default-on feature; a build with
   # --no-default-features drops it and measures ~31.7 MB, so the ceiling holds
   # for both and the owner agreed to 35 MB.
+  #
+  # 36 MB, agreed by the owner for v0.17.8, buys pictures in the viewer and the
+  # security updates that had to land with them:
+  #
+  #   34,545,008   with the image viewer (kitty, sixel, iTerm2, half blocks)
+  #   35,182,416   with zip 9, zstd 0.14, russh 0.65 and rusqlite 0.43 (+637 KB),
+  #                each of them a RustSec or GHSA advisory fix
   b=$(stat -c %s target/release/hcmd)
-  [ "$b" -lt 35000000 ] || { echo "binary is $b bytes, expected under 35000000"; exit 1; }
+  [ "$b" -lt 36000000 ] || { echo "binary is $b bytes, expected under 36000000"; exit 1; }
   echo "BINARY-SIZE-OK bytes=$b"
   ;;
 

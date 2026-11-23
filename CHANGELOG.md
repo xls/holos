@@ -2,6 +2,16 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.8
+
+- `F3` on a picture (PNG, JPEG, GIF, WebP, BMP, TIFF, ICO, TGA) draws it: with the kitty, sixel or iTerm2 protocol where the terminal has one, as half blocks anywhere else. An Info box beside it shows the format's facts and the zoom; `i` hides it. `[terminal] graphics` picks the protocol and `[viewer] image_max_size` caps the read.
+- Copy, move, delete and resize jobs run in parallel by default. `[ops] parallel_jobs` caps them (`1` runs them in turn), and reloading the config applies it to jobs already queued.
+- A folder, `..` or a file with no extension uses the empty Ext column for its name.
+- Security updates: russh 0.65 (SSH client advisories), zip 9, rusqlite 0.43 (bundled SQLite CVE), rustls, tokio, zstd and others. The yanked `am-partitions` is replaced by `rust-disk-partitions`.
+- Disk images: a partition is numbered by its slot in the table, so an empty first slot no longer renumbers the rest.
+- A zip member whose name is not UTF-8 lists in CP437, the way zip tools write it.
+- `install.sh` also finds glibc through `/lib64` (thanks @step-).
+
 ## v0.17.7
 
 - Hotlist entries are edited in the popup: `F2` renames, `Del` or `F8` removes after a prompt, and `Shift+Up` / `Shift+Down` move an entry, as the popup's bottom border says.
