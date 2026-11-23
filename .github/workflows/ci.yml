@@ -82,11 +82,11 @@ jobs:
       matrix:
         include:
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
           # Cross-compiled on Apple silicon: Intel macOS runners are scarce and
           # a queue there should not hold up a whole CI run.
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install toolchain

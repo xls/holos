@@ -2,6 +2,10 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.9
+
+- The macOS builds and the `.deb`, `.rpm` and Arch packages for everything in v0.17.8, which GitHub's retired `macos-14` runner kept from being built.
+
 ## v0.17.8
 
 - `F3` on a picture (PNG, JPEG, GIF, WebP, BMP, TIFF, ICO, TGA) draws it: with the kitty, sixel or iTerm2 protocol where the terminal has one, as half blocks anywhere else. An Info box beside it shows the format's facts and the zoom; `i` hides it. `[terminal] graphics` picks the protocol and `[viewer] image_max_size` caps the read.

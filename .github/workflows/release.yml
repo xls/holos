@@ -46,9 +46,9 @@ jobs:
            # this job sat queued for forty minutes waiting for one while every
            # other target had finished.
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-15
 
     steps:
       - uses: actions/checkout@v4
