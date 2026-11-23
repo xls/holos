@@ -133,7 +133,7 @@ impl FsId {
         Error::msg(format!("{what}: {}, not supported", self.label()))
     }
 
-    /// What `am-partitions`'s sniffer saw.
+    /// What `rust-disk-partitions`'s sniffer saw.
     ///
     /// A wildcard arm, deliberately, and the only one in this module: the
     /// house rule is exhaustive matching on *this crate's* enums, and

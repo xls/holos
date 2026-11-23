@@ -205,7 +205,7 @@ image                     = { version = "0.25", default-features = false, featur
 # library. A partition table is read, never written: `probe` and `sniff` are
 # the whole of what this backend calls, and the crate's writer is never
 # reached.
-am-partitions             = "=0.3.3"
+partitions                = { package = "rust-disk-partitions", version = "=0.7.1" }
 smb2 = "0.20.1"
 ext4-view = "0.9.3"
 squashfs_reader = "0.1.1"

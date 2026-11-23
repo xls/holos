@@ -30,7 +30,7 @@ pub const BLOCK: u64 = 4096;
 ///
 /// `0x8800`, which is the ISO 9660 primary volume descriptor at `0x8000` plus
 /// its `CD001` magic and a rounding. It is the largest window any signature
-/// in `am-partitions`'s sniffer needs.
+/// in `rust-disk-partitions`'s sniffer needs.
 pub const SNIFF_LEN: u64 = 0x8800;
 
 /// A byte range of a container file.

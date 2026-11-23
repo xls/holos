@@ -63,7 +63,7 @@ const SECTOR: usize = 512;
 
 /// CRC-32 as GPT defines it, written out rather than depended on.
 ///
-/// `crc32fast` is `am-partitions`'s own dependency and not this crate's, and
+/// `crc32fast` is `rust-disk-partitions`'s own dependency and not this crate's, and
 /// a GPT fixture needs two of these. Bit-by-bit, reflected, polynomial
 /// `0xEDB88320`: eleven lines that a reader can check against the standard
 /// instead of a table they would have to trust.
@@ -123,7 +123,7 @@ fn splice(image: &mut Vec<u8>, at: usize, bytes: &[u8]) {
 
 /// A disk image with a 512-byte MBR and each partition's payload at its LBA.
 ///
-/// The four primary entries and nothing else: `am-partitions` does not walk
+/// The four primary entries and nothing else: `rust-disk-partitions` does not walk
 /// an extended chain and neither does this backend.
 ///
 fn mbr_image(parts: &[MbrPart]) -> Vec<u8> {
@@ -199,7 +199,7 @@ const GPT_ENTRY_SIZE: usize = 128;
 /// and an entry array.
 ///
 /// `sectors` is the whole disk, so the backup header has somewhere to be even
-/// though nothing here writes one: `am-partitions` treats a missing backup as
+/// though nothing here writes one: `rust-disk-partitions` treats a missing backup as
 /// advisory and the primary is what `probe` reads.
 fn gpt_image(sectors: u64, parts: &[GptPart]) -> Vec<u8> {
     let total = usize::try_from(sectors.saturating_mul(SECTOR as u64)).unwrap_or(0);
@@ -484,6 +484,25 @@ fn an_extended_partition_is_refused_by_name() {
         why.contains("an extended partition, not supported"),
         "{why}"
     );
+}
+
+/// A partition is numbered by its slot, so an empty slot before it leaves a
+/// gap rather than renumbering it: the second slot is partition 2, as
+/// `/dev/sda2` would be.
+#[test]
+fn a_partition_after_an_empty_slot_keeps_its_slot_number() {
+    let tree = TempTree::new("slot");
+    let image = mbr_image(&[
+        MbrPart::new(0x00, 0, 0),
+        MbrPart::new(0x83, 2, 8).holding(superblock(b"        ")),
+    ]);
+    let path = tree.file("disk.img", &image);
+    let Shape::Partitioned(table) = format::detect(&path).expect("detect") else {
+        panic!("expected a partitioned disk");
+    };
+    assert_eq!(table.len(), 1);
+    assert!(table.get(1).is_none(), "slot 1 is empty");
+    assert!(table.get(2).is_some(), "the entry in slot 2 is partition 2");
 }
 
 /// The three states of the design stay apart: a recognised

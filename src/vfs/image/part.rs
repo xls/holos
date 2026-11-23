@@ -1,5 +1,5 @@
 //! The partition table (GPT and MBR, through
-//! `am-partitions`).
+//! `rust-disk-partitions`).
 //!
 //! A partition table is not a filesystem and is not browsed: it produces the
 //! listing at the image's own root, one row per partition, and each row's
@@ -19,7 +19,7 @@ use super::format::{self, FsId};
 /// The most partitions any listing will show.
 ///
 /// A GPT header declares its own entry count and a hostile one can declare
-/// millions; `am-partitions` bounds what it parses, and this bounds what is
+/// millions; the crate bounds what it parses, and this bounds what is
 /// kept. 128 is the GPT default and is four times what any real MBR chain
 /// reaches.
 pub const MAX_PARTITIONS: usize = 128;
@@ -29,7 +29,7 @@ pub const MAX_PARTITIONS: usize = 128;
 pub enum TableKind {
     /// GPT, read from LBA 1 with its CRCs checked.
     Gpt,
-    /// MBR, read from LBA 0. Primary entries only: `am-partitions` does not
+    /// MBR, read from LBA 0. Primary entries only: `rust-disk-partitions` does not
     /// walk the extended chain and neither does this.
     ///
     Mbr,
@@ -44,7 +44,7 @@ impl TableKind {
         }
     }
 
-    /// What `am-partitions` reported.
+    /// What `rust-disk-partitions` reported.
     ///
     /// Matched arm for arm and with no wildcard: `partitions::TableKind` has
     /// exactly these two variants today and is not `#[non_exhaustive]`, so a
@@ -214,14 +214,20 @@ pub fn read_table(container: &Path, size: u64) -> Result<Option<Table>> {
     let whole = Region::whole(container)?;
     let mut partitions = Vec::new();
     let mut refused = Vec::new();
-    // Numbered by **position in the table as read**, never by how many
-    // survived: skipping an entry and then counting the survivors would move
-    // partition 3 to 2 the moment partition 2 was refused, and the number is
-    // the address the listing, `Ctrl+G` and every job inside it agree on.
-    //
+    // Numbered by **the slot the entry sits in**, never by how many survived:
+    // skipping an entry and then counting the survivors would move partition
+    // 3 to 2 the moment partition 2 was refused, and the number is the
+    // address the listing, `Ctrl+G` and every job inside it agree on. The
+    // crate drops empty and container slots, so the position in its list is
+    // not the slot; it falls back to that only for an entry it has not
+    // placed, which a probe never returns.
     for (position, found) in found.iter().take(MAX_PARTITIONS).enumerate() {
-        let number = position.saturating_add(1);
-        // An entry with no bytes is a slot, not a partition. `am-partitions`
+        let number = found
+            .slot
+            .and_then(|slot| usize::try_from(slot).ok())
+            .unwrap_or(position)
+            .saturating_add(1);
+        // An entry with no bytes is a slot, not a partition. The crate
         // already drops the empty MBR slots; a GPT entry array can still
         // carry an unused entry that got this far.
         if found.length == 0 || is_unused(found) {
@@ -238,16 +244,6 @@ pub fn read_table(container: &Path, size: u64) -> Result<Option<Table>> {
             ));
             continue;
         };
-        // `am-partitions` reports an extended entry as an ordinary partition
-        // and does not walk what is behind it, so it is refused by name rather
-        // than presented as a partition whose filesystem happens to be
-        // unrecognisable.
-        if is_extended(found) {
-            refused.push(format!(
-                "partition {number}: an extended partition, not supported"
-            ));
-            continue;
-        }
         // A claim from the superblock, not a verdict: a partition that says
         // FAT32 and whose FAT is corrupt fails when it is opened, and fails as
         // damaged rather than as unsupported.
@@ -260,6 +256,10 @@ pub fn read_table(container: &Path, size: u64) -> Result<Option<Table>> {
             type_label: type_label(found),
             bootable: found.is_bootable(),
         });
+    }
+
+    if kind == partitions::TableKind::Mbr {
+        refused.extend(extended_refusals(&device, container)?);
     }
 
     if partitions.is_empty() && refused.is_empty() {
@@ -281,15 +281,38 @@ pub fn read_table(container: &Path, size: u64) -> Result<Option<Table>> {
     }))
 }
 
-/// True for the two MBR types that begin an extended chain.
-fn is_extended(found: &partitions::Partition) -> bool {
-    match found.kind {
-        partitions::PartitionKind::Mbr { type_byte, .. } => matches!(
-            type_byte,
-            partitions::mbr::types::EXTENDED_CHS | partitions::mbr::types::EXTENDED_LBA
-        ),
-        partitions::PartitionKind::Gpt { .. } | partitions::PartitionKind::Whole => false,
-    }
+/// A refusal for each extended container among the MBR's primary entries.
+///
+/// `probe` leaves the containers out - they are chains of tables, not
+/// volumes, and the crate does not walk them - so without this a disk whose
+/// data is all in logical partitions would list nothing and say nothing about
+/// why. The entry is named by its slot, like every other row.
+fn extended_refusals(device: &partitions::FileBlock, container: &Path) -> Result<Vec<String>> {
+    use partitions::BlockRead as _;
+    use partitions::mbr::{EntryRole, entry_role, layout, reserved_entries};
+
+    let mut lba0 = [0u8; partitions::SECTOR_SIZE_USIZE];
+    device.read_at(0, &mut lba0).map_err(|e| {
+        Error::msg(format!(
+            "{}: could not read the partition table: {e}",
+            container.display()
+        ))
+    })?;
+    Ok(reserved_entries(&lba0)
+        .iter()
+        .filter(|entry| {
+            entry
+                .bytes
+                .get(layout::TYPE_BYTE)
+                .is_some_and(|&kind| entry_role(kind) == EntryRole::ExtendedContainer)
+        })
+        .map(|entry| {
+            format!(
+                "partition {}: an extended partition, not supported",
+                entry.slot.saturating_add(1)
+            )
+        })
+        .collect())
 }
 
 /// Whether the table marked this entry as holding nothing.
