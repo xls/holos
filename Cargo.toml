@@ -91,7 +91,7 @@ sevenz-rust2         = "0.22.2"
 # WITHOUT ROWID for no gain, against the most-tested C there is. Bundled, so
 # it cross-compiles through the same cc path zstd and liblzma already take, and
 # adds ~2 MB. No writing, ever.
-rusqlite             = { version = "0.40.2", features = ["bundled"], optional = true }
+rusqlite             = { version = "0.43.0", features = ["bundled"], optional = true }
 # Row-to-JSON for the sqlite backend and the LocalSend wire format; already
 # in the tree transitively.
 serde_json           = "1.0.151"

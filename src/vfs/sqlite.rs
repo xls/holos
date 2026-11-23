@@ -327,11 +327,7 @@ fn column_names(conn: &Connection, table: &str) -> Result<Vec<String>> {
     let stmt = conn
         .prepare(&format!("SELECT * FROM \"{}\" LIMIT 0", escape(table)))
         .map_err(|e| Error::msg(format!("{table}: not a readable table ({e})")))?;
-    Ok(stmt
-        .column_names()
-        .into_iter()
-        .map(str::to_string)
-        .collect())
+    Ok(stmt.column_names().map(str::to_string).collect())
 }
 
 /// The column whose value is the rowid, if the table declares one.
