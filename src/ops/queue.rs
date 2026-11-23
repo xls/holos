@@ -37,13 +37,13 @@ use std::collections::{HashSet, VecDeque};
 use super::{JobId, JobKind, JobRequest, JobState, JobStatus, JobSummary};
 use crate::config::OpsConfig;
 
-/// How many contending jobs run at once by default.
+/// The `ops.parallel_jobs` value that means "no limit", and the default.
 ///
-/// One. the design wants a second `F5` to *enqueue*, and two large copies
-/// sharing a spindle finish later than the same two run in sequence. It is a
-/// constant rather than a config key because nothing in the `[ops]`
-/// table offers to set it.
-pub const DEFAULT_CONCURRENCY: usize = 1;
+/// Jobs run side by side unless the user asks otherwise: a copy to a USB
+/// stick should not wait behind one to a NAS. One spindle shared by two big
+/// copies does finish them later than running them in turn, which is what
+/// `parallel_jobs = 1` is for.
+pub const UNLIMITED: usize = 0;
 
 /// Does this kind of job wait its turn?
 ///
@@ -328,11 +328,24 @@ impl JobQueue {
     /// reading compatible with, and it is written down here rather than
     /// guessed at again in the event loop.
     pub fn from_config(cfg: &OpsConfig) -> Self {
-        Self::new(if cfg.background_queue {
-            DEFAULT_CONCURRENCY
-        } else {
+        Self::new(Self::limit_for(cfg))
+    }
+
+    /// The limit `[ops]` asks for: `parallel_jobs`, or none at all when it is
+    /// [`UNLIMITED`] or the queue is off.
+    pub const fn limit_for(cfg: &OpsConfig) -> usize {
+        if !cfg.background_queue || cfg.parallel_jobs == UNLIMITED {
             usize::MAX
-        })
+        } else {
+            cfg.parallel_jobs
+        }
+    }
+
+    /// Change the limit, as a config reload does. Raising it lets waiting jobs
+    /// start at the next [`JobQueue::release`]; lowering it never stops a
+    /// running one, it only holds the next ones back.
+    pub fn set_limit(&mut self, limit: usize) {
+        self.limit = limit.max(1);
     }
 
     /// How many contending jobs may run at once.
@@ -542,7 +555,7 @@ mod tests {
     fn a_second_copy_is_enqueued_rather_than_refused() {
         // "a second `F5` while a copy is running enqueues
         // rather than refusing".
-        let mut queue = JobQueue::new(DEFAULT_CONCURRENCY);
+        let mut queue = JobQueue::new(1);
         let mut jobs: Vec<JobStatus> = Vec::new();
 
         let first = queue.submit(request(1, JobKind::Copy), &jobs);
@@ -672,8 +685,60 @@ mod tests {
         );
         assert!(queue.is_empty());
 
-        let on = JobQueue::from_config(&OpsConfig::default());
-        assert_eq!(on.limit(), DEFAULT_CONCURRENCY);
+        let on = JobQueue::from_config(&OpsConfig {
+            parallel_jobs: 1,
+            ..OpsConfig::default()
+        });
+        assert_eq!(on.limit(), 1);
+    }
+
+    #[test]
+    fn parallel_jobs_lets_that_many_copies_run_and_queues_the_next() {
+        let cfg = OpsConfig {
+            parallel_jobs: 2,
+            ..OpsConfig::default()
+        };
+        let mut queue = JobQueue::from_config(&cfg);
+        let mut jobs = Vec::new();
+        for n in 1..=2 {
+            assert!(
+                queue.submit(request(n, JobKind::Copy), &jobs).is_some(),
+                "job {n} starts"
+            );
+            jobs.push(started(n, JobKind::Copy));
+        }
+        assert!(
+            queue.submit(request(3, JobKind::Copy), &jobs).is_none(),
+            "the third waits"
+        );
+        assert_eq!(queue.len(), 1);
+    }
+
+    #[test]
+    fn by_default_nothing_waits_for_a_slot() {
+        let mut queue = JobQueue::from_config(&OpsConfig::default());
+        let mut jobs = Vec::new();
+        for n in 1..=5 {
+            assert!(
+                queue.submit(request(n, JobKind::Copy), &jobs).is_some(),
+                "job {n} starts at once"
+            );
+            jobs.push(started(n, JobKind::Copy));
+        }
+        assert_eq!(jobs.len(), 5);
+        assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn raising_the_limit_on_reload_starts_a_waiting_job() {
+        let mut queue = JobQueue::new(1);
+        let jobs = vec![started(1, JobKind::Copy)];
+        assert!(queue.submit(request(1, JobKind::Copy), &[]).is_some());
+        assert!(queue.submit(request(2, JobKind::Copy), &jobs).is_none());
+        assert!(queue.release(&jobs).is_empty(), "one slot, taken");
+        queue.set_limit(2);
+        let ids: Vec<JobId> = queue.release(&jobs).iter().map(|r| r.id).collect();
+        assert_eq!(ids, vec![JobId(2)]);
     }
 
     #[test]

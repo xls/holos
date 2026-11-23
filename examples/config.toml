@@ -319,6 +319,10 @@ trash_on_delete = true
 confirm_overwrite = true
 # Run operations in the background queue.
 background_queue = true
+# How many copy, move, delete and resize jobs run at once; the rest wait
+# in the queue. 0, the default, is no limit. 1 runs them in turn, which
+# finishes big copies sooner when they share one disk.
+parallel_jobs = 0
 # Below this, the progress dialog's per-file bar is omitted because it
 # would only ever flash.
 file_bar_min_size = "1MiB"

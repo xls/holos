@@ -1102,6 +1102,10 @@ pub struct OpsConfig {
     pub confirm_overwrite: bool,
     /// Run operations in the background queue.
     pub background_queue: bool,
+    /// How many copy, move, delete and resize jobs run at once; the rest wait
+    /// in the queue. 0, the default, is no limit. 1 runs them in turn, which
+    /// finishes big copies sooner when they share one disk.
+    pub parallel_jobs: usize,
     /// Below this, the progress dialog's per-file bar is omitted because it
     /// would only ever flash.
     pub file_bar_min_size: ByteSize,
@@ -1138,6 +1142,7 @@ impl Default for OpsConfig {
             trash_on_delete: true,
             confirm_overwrite: true,
             background_queue: true,
+            parallel_jobs: 0,
             file_bar_min_size: ByteSize::mib(1),
             rate_window: Timeout(std::time::Duration::from_secs(3)),
             rate_min_samples: 4,

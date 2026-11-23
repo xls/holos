@@ -1893,12 +1893,15 @@ fn f2_renames_in_place() {
     );
 }
 
-/// "a second `F5` while a copy is running enqueues rather than
-/// refusing." Enqueuing is work, not a display flag - the second job waits for
-/// a slot rather than running beside the first.
+/// With `parallel_jobs = 1`, "a second `F5` while a copy is running enqueues
+/// rather than refusing." Enqueuing is work, not a display flag - the second
+/// job waits for a slot rather than running beside the first.
 #[test]
 fn a_second_copy_waits_for_the_first_rather_than_running_beside_it() {
     let mut app = two_panels(&["a.rs"]);
+    let mut ops = app.config.ops.clone();
+    ops.parallel_jobs = 1;
+    app.jobs.configure(&ops);
     press(&mut app, KeyCode::F(5), NONE);
     press(&mut app, KeyCode::Enter, NONE);
     let first = app.take_pending_jobs();
@@ -1916,6 +1919,18 @@ fn a_second_copy_waits_for_the_first_rather_than_running_beside_it() {
     finish_job(&mut app, first[0].id);
     let second = app.take_pending_jobs();
     assert_eq!(second.len(), 1, "and then it runs");
+    assert_eq!(app.queued_jobs(), 0);
+}
+
+/// The default is no limit: a second copy runs beside the first.
+#[test]
+fn by_default_a_second_copy_runs_beside_the_first() {
+    let mut app = two_panels(&["a.rs"]);
+    for n in 1..=2 {
+        press(&mut app, KeyCode::F(5), NONE);
+        press(&mut app, KeyCode::Enter, NONE);
+        assert_eq!(app.take_pending_jobs().len(), 1, "copy {n} starts at once");
+    }
     assert_eq!(app.queued_jobs(), 0);
 }
 

@@ -67,6 +67,16 @@ impl Jobs {
         }
     }
 
+    /// Apply a reloaded `[ops]` to the queue's limit.
+    pub fn configure(&mut self, ops: &OpsConfig) {
+        self.queue.set_limit(JobQueue::limit_for(ops));
+    }
+
+    /// How many contending jobs may run at once.
+    pub const fn limit(&self) -> usize {
+        self.queue.limit()
+    }
+
     /// Every status row, in the order the jobs were started.
     pub fn rows(&self) -> &[JobStatus] {
         &self.rows

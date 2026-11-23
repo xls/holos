@@ -103,6 +103,7 @@ impl App {
         // re-resolved rather than left at whatever startup detected.
         self.color_depth = ColorDepth::resolve(loaded.config.terminal.colors);
         self.config = loaded.config;
+        self.jobs.configure(&self.config.ops);
         self.keymap = loaded.keymap;
         self.theme = loaded.theme;
         let arrived = loaded.warnings.len();
@@ -349,6 +350,19 @@ mod tests {
         assert!(!app.reload_requested);
         app.reload_config();
         assert!(app.reload_requested, "a flag, not a config read");
+    }
+
+    #[test]
+    fn a_reload_applies_the_parallel_job_limit_to_the_running_queue() {
+        let mut cfg = Config::default();
+        cfg.ops.parallel_jobs = 1;
+        let mut app = App::headless(cfg, Keymap::builtin(), Theme::blue());
+        assert_eq!(app.jobs.limit(), 1);
+
+        let mut loaded = Loaded::default();
+        loaded.config.ops.parallel_jobs = 3;
+        app.apply_reload(loaded);
+        assert_eq!(app.jobs.limit(), 3, "no restart needed");
     }
 
     #[test]
