@@ -228,10 +228,13 @@ impl Default for ExpectedPanics {
 
 impl Drop for ExpectedPanics {
     fn drop(&mut self) {
+        // Thread-local, so nothing else can touch it between the load and the
+        // store: no compare-and-swap loop needed.
         let _ = EXPECTING_PANIC.try_with(|depth| {
-            let _ = depth.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |depth| {
-                Some(depth.saturating_sub(1))
-            });
+            depth.store(
+                depth.load(Ordering::SeqCst).saturating_sub(1),
+                Ordering::SeqCst,
+            );
         });
     }
 }

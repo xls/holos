@@ -195,8 +195,11 @@ drive lists), `ArchiveFs`, `RemoteFs`, `ImageFs`.
 
 `read_dir` returns a **channel, not a Vec**, because a listing must appear as it
 is found: an archive index, a remote walk and a search all fill a panel while
-they are still running. Send the `..` row first and unconditionally, so a panel
-whose listing failed still has the row that gets the user out.
+they are still running. Do **not** send a `..` row: the read path asks
+`Vfs::parent_row` before the listing starts and puts that row first, so a
+panel whose listing failed still has the way out, and no backend can forget
+it. Override `parent_row` only for a flat listing (search results) that has
+nowhere up to go.
 
 ### `VfsPath` is a stack of segments
 

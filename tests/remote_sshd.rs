@@ -503,16 +503,25 @@ async fn a_panel_reads_a_real_server_through_the_vfs_trait() {
         .await;
     }
 
-    // And read the directory back, through the same channel a panel reads.
+    // And read the directory back the way a panel does: the read path asks
+    // `parent_row` first and prepends it, then drains the channel.
+    let mut names: Vec<String> = Vfs::parent_row(router.as_ref(), &here)
+        .map(|p| p.name)
+        .into_iter()
+        .collect();
     let mut rx = Vfs::read_dir(router.as_ref(), &here);
-    let mut names = Vec::new();
     while let Some(row) = rx.recv().await {
         names.push(row.expect("a row").name);
     }
     assert_eq!(
         names.first().map(String::as_str),
         Some(".."),
-        "the backend synthesises the parent row"
+        "a remote directory has a way up"
+    );
+    assert_eq!(
+        names.iter().filter(|n| *n == "..").count(),
+        1,
+        "and only one: the server's own `..` is dropped: {names:?}"
     );
     assert!(
         names.iter().any(|n| n == "through-the-trait.txt"),

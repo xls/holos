@@ -275,10 +275,10 @@ impl Vfs for RemoteFs {
         let ttl = self.ttl;
 
         tokio::task::spawn_blocking(move || {
-            // The `..` row goes first and **before** the listing is attempted,
-            // for the reason `LocalFs::read_dir` gives: it is navigation, not
-            // content, and a directory that cannot be read must still have a
-            // row to escape by.
+            // No `..` here: the read path prepends `Vfs::parent_row` before the
+            // listing is attempted, so a directory that cannot be read still
+            // has its way out. A `..` the server lists is a name like any
+            // other and is dropped below.
             let dir = match resolved {
                 Ok(dir) => dir,
                 Err(err) => {
