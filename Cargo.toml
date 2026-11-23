@@ -73,7 +73,7 @@ chardetng            = "=1.0.0"
 # rejects `xz2` (last release 2022-06-06) and names `liblzma`, which is maintained and
 # API-compatible. The rejected-crates table is the authority, so this is
 # `liblzma`.
-zip                  = "8.6.0"
+zip                  = "9.8.2"
 tar                  = "0.4.46"
 flate2               = "1.1.9"
 # `static` forwards to `liblzma-sys/static`, which builds and links the xz
@@ -82,7 +82,7 @@ flate2               = "1.1.9"
 # not start on a host without xz installed is the same problem one layer down,
 # so it is bundled. `ldd` must not name liblzma.
 liblzma              = { version = "0.4.8", features = ["static"] }
-zstd                 = "0.13.3"
+zstd                 = "0.14.4"
 bzip2                = "0.6.1"
 sevenz-rust2         = "0.22.2"
 # SQLite, read-only, for the database listing backend. The one C library the

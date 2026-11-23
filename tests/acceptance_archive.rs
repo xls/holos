@@ -220,6 +220,7 @@ fn zip_names(path: &Path) -> Vec<String> {
                 .by_index(i)
                 .expect("a member")
                 .name()
+                .expect("a decodable name")
                 .trim_end_matches('/')
                 .to_string()
         })

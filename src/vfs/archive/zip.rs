@@ -105,7 +105,7 @@ impl ArchiveFormat for ZipFormat {
                 // the others.
                 continue;
             };
-            let name = entry.name().to_string();
+            let name = member_name(&entry);
             let size = entry.size();
             let mode = entry.unix_mode().unwrap_or(0);
             let mtime = entry.last_modified().and_then(to_system_time);
@@ -282,7 +282,7 @@ fn survey(container: &Path) -> Result<(Vec<Existing>, u64)> {
         };
         let start = entry.central_header_start();
         central = Some(central.map_or(start, |had: u64| had.min(start)));
-        let raw = entry.name().to_string();
+        let raw = member_name(&entry);
         let is_dir = entry.is_dir();
         let is_symlink = entry.is_symlink();
         let mode = entry.unix_mode().unwrap_or(0);
@@ -536,6 +536,20 @@ fn link_target(archive: &mut zip::ZipArchive<std::fs::File>, ordinal: usize) -> 
     String::from_utf8_lossy(&buf).into_owned()
 }
 
+/// A member's name: UTF-8, or CP437 where it is not, as `zip` decodes it.
+///
+/// `zip` returns the CP437 reading as a `Result`; should that ever fail, the
+/// member is still addressed by its position in the central directory, so it
+/// is listed and opened under a lossy name rather than vanishing from the
+/// listing. The index and a write must agree on the name, which is why both
+/// go through this.
+fn member_name<R: std::io::Read + ?Sized>(entry: &zip::read::ZipFile<'_, R>) -> String {
+    entry.name().map_or_else(
+        |_| String::from_utf8_lossy(entry.name_raw()).into_owned(),
+        std::borrow::Cow::into_owned,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -607,11 +621,12 @@ mod tests {
     }
 
     #[test]
-    fn a_name_that_is_not_utf8_lists_lossily_and_still_opens() {
-        // The same rule `LocalFs` follows. A zip with the UTF-8 flag set and a
-        // name that is not UTF-8 is the shape this happens in; the member is
-        // still addressed by its position in the central directory, so it opens
-        // whatever its name decoded to.
+    fn a_name_that_is_not_utf8_lists_as_cp437_and_still_opens() {
+        // A name that is not UTF-8 is read as CP437, the encoding zips used
+        // before the UTF-8 flag existed; every byte has a character there, so
+        // the name is shown rather than lost. The member is still addressed by
+        // its position in the central directory, so it opens whatever its name
+        // decoded to.
         let dir = temp("lossy");
         let path = dir.join("latin1.zip");
         write_zip(&path, &[("caf\u{e9}.txt", b"not utf-8")]);
@@ -635,15 +650,13 @@ mod tests {
         assert_eq!(index.len(), 1);
         let (_, rows, _) = index.children_from("", 0);
         let name = rows.first().map(|e| e.name.clone()).unwrap_or_default();
-        assert!(
-            name.contains('\u{fffd}'),
-            "the undecodable byte renders lossily, got {name:?}"
-        );
-        let member = index.get(&name).expect("the lossy name is the index key");
+        // 0xE9 0xA9 in CP437.
+        assert_eq!(name, "caf\u{398}\u{2310}.txt", "read as CP437");
+        let member = index.get(&name).expect("the decoded name is the index key");
         let mut got = Vec::new();
         ZipFormat
             .read_member(&path, &member, &mut got)
-            .expect("a lossy name is still openable");
+            .expect("a re-decoded name is still openable");
         assert_eq!(got, b"not utf-8");
         let _ = std::fs::remove_dir_all(&dir);
     }
