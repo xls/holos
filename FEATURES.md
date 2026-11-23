@@ -117,7 +117,8 @@ nest, and the type is decided by content, not by the extension.
   timestamp, following the cursor field by field.
 - Pictures in document mode: PNG, JPEG, GIF, WebP, BMP, TIFF, ICO and TGA,
   drawn with the kitty, sixel or iTerm2 protocol where the terminal has one and
-  as half blocks anywhere else; `i` shows the format's facts and the zoom.
+  as half blocks anywhere else, beside the format's facts and the zoom (`i`
+  hides them).
 - Binary templates paint the regions they know in hex and name each field in the
   status bar.
 

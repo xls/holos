@@ -604,6 +604,8 @@ pub struct Viewer {
     image_scaled: Option<::image::RgbaImage>,
     /// `viewer.image_max_size`.
     image_max: u64,
+    /// Whether the picture's facts box is open. See [`Viewer::picture_facts`].
+    picture_facts: bool,
     /// Where [`Viewer::template`] came from, which is what keeps an
     /// automatic match from overwriting a choice.
     template_pick: TemplatePick,
@@ -927,6 +929,7 @@ impl Viewer {
             image: None,
             image_scaled: None,
             image_max: cfg.image_max_size.bytes(),
+            picture_facts: true,
             template_pick: TemplatePick::Unset,
             template_match_pending: mode == ViewerMode::Hex,
             field_reading: None,

@@ -1542,7 +1542,7 @@ const fn viewer_description(action: crate::input::Action) -> &'static str {
             "Show the document rendered: a JSON tree, a page's text, Markdown made, a picture drawn"
         }
         Action::Inspect => {
-            "Hex: read the bytes at the cursor every way; a picture: its facts and zoom"
+            "Hex: read the bytes at the cursor every way; a picture: hide or show its facts"
         }
         Action::FoldToggle => "Collapse or expand this line's region (mode 3)",
         Action::FoldAll => "Collapse every region (mode 3)",

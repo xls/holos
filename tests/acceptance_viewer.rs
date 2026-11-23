@@ -2490,8 +2490,15 @@ fn picture_1_half_blocks_draw_a_png_in_its_own_colours() {
     assert_eq!(s.fg(row, first), Some(rgb((255, 0, 0))), "{}", s.dump());
     assert_eq!(s.fg(row, last), Some(rgb((0, 255, 0))), "{}", s.dump());
 
-    s.press(b"i", "the facts box", |s| s.text().contains("File size"));
+    assert!(
+        s.text().contains("File size"),
+        "the facts are open: {}",
+        s.dump()
+    );
     assert!(s.text().contains("64 x 32"), "{}", s.dump());
+    s.press(b"i", "the facts box to close", |s| {
+        !s.text().contains("File size")
+    });
 }
 
 #[test]

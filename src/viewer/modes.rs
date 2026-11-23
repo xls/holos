@@ -387,13 +387,24 @@ impl Viewer {
         self.hex_cfg
     }
 
-    /// `i`: open or close the reading panel.
+    /// `i`: open or close the reading panel - or, on a picture, its facts.
     ///
     /// Hex only where it is drawn, but the flag is kept whatever the mode is:
     /// looking at something as text and coming back should not cost the key
-    /// press again.
-    pub const fn toggle_inspect(&mut self) {
-        self.inspect = !self.inspect;
+    /// press again. A picture has a flag of its own, because its box starts
+    /// open and the reading panel starts closed.
+    pub fn toggle_inspect(&mut self) {
+        if self.is_picture() {
+            self.picture_facts = !self.picture_facts;
+        } else {
+            self.inspect = !self.inspect;
+        }
+    }
+
+    /// Whether a picture's facts box is open. Open until `i` closes it: it is
+    /// what mode 3 showed for an image before the picture was drawn.
+    pub const fn picture_facts(&self) -> bool {
+        self.picture_facts
     }
 
     /// Whether the reading panel is open.

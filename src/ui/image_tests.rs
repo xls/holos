@@ -110,6 +110,8 @@ fn half_blocks_draw_the_picture_in_its_own_colours() {
 #[test]
 fn the_picture_keeps_its_proportion_and_is_centred() {
     let mut app = app_with_picture(Protocol::Halfblocks);
+    // Centred in the whole body, so without the facts box beside it.
+    app.viewer_mut().unwrap().toggle_inspect();
     let buf = frame(&mut app, 100, 24);
     let cells = half_blocks(&buf);
     let xs: Vec<u16> = cells.iter().map(|c| c.0).collect();
@@ -125,12 +127,30 @@ fn the_picture_keeps_its_proportion_and_is_centred() {
 }
 
 #[test]
-fn i_puts_the_template_facts_and_the_zoom_beside_the_picture() {
+fn the_template_facts_and_the_zoom_sit_beside_the_picture_from_the_start() {
     let mut app = app_with_picture(Protocol::Halfblocks);
-    app.viewer_mut().unwrap().toggle_inspect();
     let buf = frame(&mut app, 120, 30);
     let screen = text(&buf);
     assert!(screen.contains("PNG image"), "{screen}");
+    // The box is titled with its key underlined.
+    let (x, y) = (0..30_u16)
+        .find_map(|y| {
+            let row: String = (0..120_u16).map(|x| buf[(x, y)].symbol()).collect();
+            row.find(" Info ")
+                .map(|at| (row[..at].chars().count() as u16 + 1, y))
+        })
+        .expect("the box title");
+    assert_eq!(buf[(x, y)].symbol(), "I");
+    assert!(
+        buf[(x, y)]
+            .modifier
+            .contains(ratatui::style::Modifier::UNDERLINED)
+    );
+    assert!(
+        !buf[(x + 1, y)]
+            .modifier
+            .contains(ratatui::style::Modifier::UNDERLINED)
+    );
     assert!(screen.contains("40 x 20"), "{screen}");
     assert!(screen.contains("File size"), "{screen}");
     assert!(screen.contains("halfblocks"), "{screen}");
@@ -142,6 +162,22 @@ fn i_puts_the_template_facts_and_the_zoom_beside_the_picture() {
         })
         .unwrap();
     assert!(half_blocks(&buf).iter().all(|(x, _)| *x < boxed - 2));
+}
+
+#[test]
+fn i_hides_the_facts_and_gives_the_picture_the_room() {
+    let mut app = app_with_picture(Protocol::Halfblocks);
+    let with_box = half_blocks(&frame(&mut app, 120, 30)).len();
+    app.viewer_mut().unwrap().toggle_inspect();
+    assert!(
+        !app.viewer().unwrap().inspecting(),
+        "the hex panel is untouched"
+    );
+    let buf = frame(&mut app, 120, 30);
+    assert!(!text(&buf).contains("File size"));
+    assert!(half_blocks(&buf).len() > with_box, "the picture grew");
+    app.viewer_mut().unwrap().toggle_inspect();
+    assert!(text(&frame(&mut app, 120, 30)).contains("File size"));
 }
 
 #[test]

@@ -8,14 +8,15 @@
 //! [`placement`] is the one answer both sides read, so the frame and the
 //! picture cannot disagree about where it is.
 //!
-//! `i` (the hex mode's reading panel key) puts a box of facts at the top right:
-//! what the decoder found and what the format's template says. The picture is
+//! A box of facts sits at the top right from the start - what the format's
+//! template says, which is what mode 3 showed for an image before it drew
+//! one - and `i` (the hex mode's reading panel key) hides it. The picture is
 //! fitted beside the box rather than under it, because a kitty picture sits on
 //! a layer above the text and would cover it.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
 
@@ -55,7 +56,7 @@ const fn cell_for(app: &App) -> (u16, u16) {
 
 /// The box of facts, and what is left for the picture.
 fn split(app: &App, viewer: &Viewer, picture: &Picture, body: Rect) -> (Rect, Option<Rect>) {
-    if !viewer.inspecting() {
+    if !viewer.picture_facts() {
         return (body, None);
     }
     let lines = facts(app, viewer, picture, None);
@@ -293,7 +294,13 @@ fn draw_facts(
     let block = Block::bordered()
         .border_set(glyphs.border_set())
         .border_style(style)
-        .title(" i ")
+        // `I` underlined, as a dialog marks its mnemonics: it is the key that
+        // hides the box.
+        .title(Line::from(vec![
+            Span::styled(" ", style),
+            Span::styled("I", style.add_modifier(Modifier::UNDERLINED)),
+            Span::styled("nfo ", style),
+        ]))
         .style(style);
     let inner = block.inner(area);
     f.render_widget(ratatui::widgets::Clear, area);
