@@ -11,7 +11,9 @@ Browse, search, preview and move files across local folders, archives and remote
 
 [![Built for Omarchy](https://raw.githubusercontent.com/tcballard/omarchy-badges/85f859029e236e784e7b05ada6dbe73506d07a91/badges/v1/built-for-omarchy.svg)](https://github.com/tcballard/omarchy-badges)
 
-[Install](#install) &nbsp; / &nbsp; [Explore the features](#made-for-more-than-moving-files) &nbsp; / &nbsp; [First steps](#your-first-minute) &nbsp; / &nbsp; [Releases](https://github.com/xls/holos/releases)
+[Install](#install) &nbsp; / &nbsp; [Explore the features](#made-for-more-than-moving-files) &nbsp; / &nbsp; [First steps](#your-first-minute) &nbsp; / &nbsp; [Releases](https://github.com/xls/holos/releases) 
+
+[![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-donate-yellow.svg)](https://buymeacoffee.com/pacha)
 
 </div>
 
