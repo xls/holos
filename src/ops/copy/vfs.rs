@@ -527,7 +527,7 @@ pub fn list_via_vfs(vfs: &dyn Vfs, path: &VfsPath) -> (Vec<Entry>, Option<Error>
 /// below anything that exists is built one level at a time - the same walk
 /// `ops::mkdir` does, for the same reason: a failure names the level that
 /// actually failed.
-fn ensure_dir_via_vfs(vfs: &dyn Vfs, dir: &VfsPath) -> Result<()> {
+pub(crate) fn ensure_dir_via_vfs(vfs: &dyn Vfs, dir: &VfsPath) -> Result<()> {
     if matches!(vfs.stat(dir).map(|e| e.kind), Ok(EntryKind::Dir)) {
         return Ok(());
     }
@@ -566,7 +566,7 @@ fn ensure_dir_via_vfs(vfs: &dyn Vfs, dir: &VfsPath) -> Result<()> {
 ///
 /// Either way the **source** is [`Vfs::open_read`], which for an archive
 /// member streams through a pipe under the byte caps.
-fn copy_one_via_vfs(
+pub(crate) fn copy_one_via_vfs(
     vfs: &dyn Vfs,
     src: &VfsPath,
     dst: &VfsPath,

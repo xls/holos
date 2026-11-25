@@ -470,6 +470,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
         app.service_serve(&serve_tx);
         app.service_exe_watch(std::time::Instant::now());
         app.service_localsend();
+        app.service_sync();
         app.service_file_info(&info_tx);
         app.service_links(&link_tx);
         service_git_status(&mut app, &git_tx);
@@ -767,22 +768,24 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
         // The picture in mode 3: decoded once off this thread, scaled to the
         // cells it gets when that size changes, and - for kitty, sixel and
         // iTerm2 - sent after the frame by the painter.
-        if app.graphics != term::graphics::Protocol::Off
-            && let Some(job) = app.viewer_mut().and_then(viewer::Viewer::take_image_job)
-        {
-            let tx = image_tx.clone();
-            tokio::task::spawn_blocking(move || {
-                let _ = tx.blocking_send(viewer::image::decode(job));
-            });
+        // The quick view's picture takes the same road.
+        if app.graphics != term::graphics::Protocol::Off {
+            let jobs = [
+                app.viewer_mut().and_then(viewer::Viewer::take_image_job),
+                app.quick_viewer_mut()
+                    .and_then(viewer::Viewer::take_image_job),
+            ];
+            for job in jobs.into_iter().flatten() {
+                let tx = image_tx.clone();
+                tokio::task::spawn_blocking(move || {
+                    let _ = tx.blocking_send(viewer::image::decode(job));
+                });
+            }
         }
         if app.graphics.is_pixels() {
             app.cell_px = term::graphics::cell_pixels();
         }
-        if let Some((w, h)) = ui::image::scaled_size(&app, area)
-            && let Some(v) = app.viewer_mut()
-        {
-            v.prepare_scaled(w, h);
-        }
+        ui::image::prepare(&mut app, area);
         let placement = ui::image::placement(&app, area);
         if painter.must_clear(placement.as_ref()) {
             term.terminal().clear()?;
@@ -791,7 +794,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
         painter.paint(
             &mut std::io::stdout(),
             placement,
-            app.viewer().and_then(viewer::Viewer::scaled_picture),
+            ui::image::shown(&app, area),
             ui::image::background(&app),
         )?;
 
@@ -837,6 +840,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
             app.console_settle_deadline(),
             app.quick_view_deadline(),
             app.drives_deadline(),
+            app.sync_deadline(),
             walk_tick,
             download_tick,
             blink_tick,

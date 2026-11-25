@@ -33,6 +33,7 @@ pub mod help;
 pub mod image;
 pub mod panelview;
 pub mod quickview;
+pub mod syncview;
 pub mod text;
 pub mod viewer;
 pub mod volume;
@@ -225,23 +226,41 @@ pub fn sync_view_rows(app: &mut App, area: Rect) {
         let tabs = panel.tab_bar_visible(setting);
         panel.view_rows = panelview::entry_row_count(rect, tabs);
     }
+    // The sync view pages by the rows a panel has, laid out without a tab
+    // bar so both panels' rows line up.
+    if let Some(view) = app.sync_view_mut() {
+        view.set_view_rows(usize::from(panelview::rows(l.left, false).entries.height));
+    }
     // the quick view is a viewer drawn into a panel body, and a
     // viewer has to be laid out for the size it will be drawn at before the
     // keys waiting behind it are applied. The same measurement `main` makes
     // for the full-screen viewer, taken here because this is where the panel
     // rectangles are.
-    if let Some(side) = app.quick_view_side() {
-        let rect = match side {
-            Side::Left => l.left,
-            Side::Right => l.right,
-        };
-        let tabs = app.panel(side).tab_bar_visible(setting);
-        let body = panelview::rows(rect, tabs).entries;
+    if let Some(body) = quick_view_body(app, area) {
         let cols = app
             .quick_viewer()
             .map_or(body.width, |v| viewer::body_cols_for(v, body));
         app.set_quick_view_geometry(body.height, cols);
     }
+}
+
+/// The rectangle a quick view's file is drawn in on a screen of `area`: the
+/// entry rows of the panel showing it. `None` when there is no quick view, or
+/// the screen is too small for panels at all.
+pub(crate) fn quick_view_body(app: &App, area: Rect) -> Option<Rect> {
+    if too_small(area.width, area.height) {
+        return None;
+    }
+    let side = app.quick_view_side()?;
+    let l = layout(app, area);
+    let rect = match side {
+        Side::Left => l.left,
+        Side::Right => l.right,
+    };
+    let tabs = app
+        .panel(side)
+        .tab_bar_visible(app.config.panel.show_tab_bar);
+    Some(panelview::rows(rect, tabs).entries)
 }
 
 /// Tell every dialog on the stack the interior it is about to be drawn into.
@@ -332,8 +351,15 @@ pub fn draw(f: &mut Frame, app: &App) {
     if l.menubar.height > 0 {
         draw_menubar(f, app, l.menubar);
     }
-    panelview::draw(f, app, Side::Left, l.left);
-    panelview::draw(f, app, Side::Right, l.right);
+    if app.sync_view().is_some() {
+        // `Ctrl+Alt+S`: both panels show the two trees, row facing row, each
+        // with a column against the middle border saying what will be done.
+        syncview::draw_panel(f, app, Side::Left, l.left);
+        syncview::draw_panel(f, app, Side::Right, l.right);
+    } else {
+        panelview::draw(f, app, Side::Left, l.left);
+        panelview::draw(f, app, Side::Right, l.right);
+    }
     draw_activity_indicator(f, app, l.right);
     cmdline::draw(f, app, l.cmdline);
     if l.keybar.height > 0 {

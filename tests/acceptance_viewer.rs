@@ -2537,6 +2537,26 @@ fn picture_3_sixel_sends_a_sixel_and_only_once() {
 }
 
 #[test]
+fn picture_5_ctrl_q_shows_the_picture_in_the_other_panel() {
+    let tree = Tree::new("pic5");
+    tree.file("shot.png", picture_png());
+    let launch = Launch::new(100, 30, tree.path()).config("[terminal]\ngraphics = \"kitty\"\n");
+    let mut s = Session::start(launch);
+    s.wait_for_listing("shot");
+    s.press_to(keys::DOWN, "shot");
+    // Ctrl+Q, as a legacy terminal sends it.
+    s.send(b"\x11");
+    s.wait("the kitty picture in the quick view", |s| {
+        s.raw_since(0).contains("\x1b_Ga=T,f=32")
+    });
+    let mark = s.raw.len();
+    s.send(b"\x11");
+    s.wait("the picture to go with the quick view", |s| {
+        s.raw_since(mark).contains("\x1b_Ga=d,d=I")
+    });
+}
+
+#[test]
 fn picture_4_a_terminal_that_says_sixel_gets_sixel_without_being_told() {
     // Device Attributes listing `4`, as foot and xterm answer.
     let tree = Tree::new("pic4");

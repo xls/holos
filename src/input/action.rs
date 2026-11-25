@@ -180,6 +180,7 @@ actions! {
     ContextMenu       = "context_menu",      V07, "Context menu for the entry under the cursor";
     CompareDirs       = "compare_dirs",      V07, "Compare the two file lists";
     CompareDirsContent = "compare_dirs_content", V09, "Compare the two file lists by content";
+    SyncDirs          = "sync_dirs",         V09, "Synchronize the two panels' directories";
     CompareFiles      = "compare_files",     V09, "Compare the two files byte for byte";
     DiffFiles         = "diff_files",        V09, "Show the two files as a diff";
     ToggleDiff        = "toggle_diff",       V09, "Swap mode 3 between the document and the diff";
@@ -219,6 +220,7 @@ actions! {
     ShowHidden        = "show_hidden",       V01,  "Toggle showing hidden files";
     ConnectToggle     = "connect_toggle",    V065, "Connect or disconnect the active panel";
     DirSize           = "dir_size",          V02, "Calculate the space the selection occupies";
+    SizeAll           = "size_all",          V09, "Calculate the space of every directory in the listing";
     BranchView        = "branch_view",       V06, "Flat recursive listing of the current tree";
     MultiRename       = "multi_rename",      V06, "Multi-rename tool";
     QuickView         = "quick_view",        V07, "Quick view in the other panel";
@@ -448,10 +450,9 @@ impl Action {
                 // empties it, whoever owns the text: with a shell running that
                 // means sending the shell a kill-line rather than forwarding
                 // the Esc, because a user who presses Esc at a command line
-                // wants the line gone. The cost is that a vi-mode shell cannot
-                // be put into normal mode from a non-empty line - Esc on an
-                // *empty* line is still forwarded, which is where a vi user
-                // reaches for it least often, and `alt+esc` or a rebind in
+                // wants the line gone, and the same press hands focus back to
+                // the panel. The cost is that a vi-mode shell cannot be put
+                // into normal mode with Esc; `alt+esc` or a rebind in
                 // [cmdline] gets it back for anyone who wants it.
                 | Self::Complete
         )

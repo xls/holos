@@ -73,6 +73,7 @@ pub mod spec;
 pub mod split;
 pub mod status;
 pub mod summary;
+pub mod sync;
 pub mod walk;
 
 use std::sync::Arc;
@@ -181,6 +182,7 @@ pub fn run(vfs: &dyn Vfs, spec: &JobSpec, ctx: &mut JobContext) {
         JobKind::Resize => resize::run(vfs, spec, ctx),
         JobKind::Download => download::run(vfs, spec, ctx),
         JobKind::LocalSend => localsend::run(vfs, spec, ctx),
+        JobKind::Sync => sync::run(vfs, spec, ctx),
     }
 }
 

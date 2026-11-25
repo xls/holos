@@ -1645,3 +1645,63 @@ fn criterion_10_a_per_file_failure_does_not_abort_the_batch() {
 
     let _ = fs::set_permissions(&locked, fs::Permissions::from_mode(0o644));
 }
+
+// ---------------------------------------------------------------------------
+// Ctrl+Alt+S: synchronize the two panels' directories
+// ---------------------------------------------------------------------------
+
+#[test]
+fn sync_copies_what_is_new_one_way_and_asks_first() {
+    let t = Tree::new("sync");
+    t.file("src/keep.txt", b"on both sides");
+    t.file("dst/keep.txt", b"on both sides");
+    let old = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000_000);
+    for rel in ["src/keep.txt", "dst/keep.txt"] {
+        fs::File::options()
+            .write(true)
+            .open(t.root().join(rel))
+            .expect("open for set_times")
+            .set_modified(old)
+            .expect("set_modified");
+    }
+    t.file("src/deep/new.txt", b"only on the left");
+    t.file("dst/backup-only.txt", b"only on the right");
+
+    let mut s = Session::start(Launch::new(t.src()));
+    s.wait_for("the source listing", |t| {
+        t.contains("keep") && t.contains("deep")
+    });
+    s.point_other_panel_at(&t.dst());
+
+    // Ctrl+Alt+S, as a legacy terminal spells it: ESC then Ctrl+S.
+    s.send(b"\x1b\x13");
+    s.wait_for("the compared trees in the panels", |t| {
+        t.contains("One way") && t.contains("deep/new.txt") && t.contains("copy 1 to the right")
+    });
+    let screen = s.text();
+    assert!(
+        !screen.contains("keep.txt"),
+        "a file that is the same starts hidden:\n{screen}"
+    );
+    assert!(
+        screen
+            .lines()
+            .any(|l| l.contains("deep/new.txt") && l.contains('\u{2192}')),
+        "the arrow beside the border:\n{screen}"
+    );
+    s.press(keys::F5, "the question", |t| {
+        t.contains("Copy 1 to the right")
+    });
+    assert!(
+        !t.dst().join("deep/new.txt").exists(),
+        "nothing before the answer"
+    );
+    s.send(keys::ENTER);
+    s.wait("the copy", |_| t.dst().join("deep/new.txt").exists());
+    s.wait_for("the panels to come back", |t| !t.contains("One way"));
+    assert_eq!(read(&t.dst().join("deep/new.txt")), b"only on the left");
+    assert!(
+        t.dst().join("backup-only.txt").exists(),
+        "one way never deletes"
+    );
+}

@@ -146,7 +146,7 @@ const FILES: [Action; 15] = [
 
 /// the `Mark` menu: the marking, the compare and the clipboard, which
 /// are the operations that act on a selection.
-const MARK: [Action; 11] = [
+const MARK: [Action; 12] = [
     Action::SelectAll,
     Action::InvertSelection,
     Action::SelectMask,
@@ -155,13 +155,14 @@ const MARK: [Action; 11] = [
     Action::CompareDirsContent,
     Action::CompareFiles,
     Action::DirSize,
+    Action::SizeAll,
     Action::ClipboardCopy,
     Action::ClipboardCut,
     Action::ClipboardPaste,
 ];
 
 /// the `Commands` menu.
-const COMMANDS: [Action; 15] = [
+const COMMANDS: [Action; 16] = [
     Action::Search,
     Action::SearchInPanel,
     Action::BranchView,
@@ -170,6 +171,7 @@ const COMMANDS: [Action; 15] = [
     Action::Download,
     Action::Serve,
     Action::SendDevice,
+    Action::SyncDirs,
     Action::HotlistAdd,
     Action::GotoPath,
     Action::SwapPanels,

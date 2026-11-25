@@ -488,6 +488,11 @@ impl fmt::Debug for QuickFilter {
 /// One tab: a working folder and nothing more.
 #[derive(Debug, Clone)]
 pub struct Tab {
+    /// The measured tree size of each directory row that has one, by name:
+    /// what `Space`, `Ctrl+L` and `Ctrl+Shift+L` found. Kept here so that
+    /// sorting by size puts the directories in their real order too, the way
+    /// Total Commander does once it has sized them.
+    pub tree_sizes: std::collections::HashMap<String, u64>,
     /// Where this tab is looking.
     pub path: VfsPath,
     /// The rows, in render order. Index 0 is the `..` row when there is one.
@@ -675,6 +680,7 @@ impl Tab {
             remote_view: None,
             sorted_rows: 0,
             merging: None,
+            tree_sizes: std::collections::HashMap::new(),
         }
     }
 
@@ -1497,6 +1503,14 @@ impl Tab {
         let key = self.sort.key;
         let reverse = self.sort.reverse;
         let secondary = self.sort.secondary;
+        // Measured directory sizes take part only when every directory row
+        // has one.
+        let tree_sizes = self
+            .entries
+            .iter()
+            .filter(|e| !e.is_parent && e.is_dir())
+            .all(|e| self.tree_sizes.contains_key(&e.name))
+            .then_some(&self.tree_sizes);
 
         self.entries.sort_by(|a, b| {
             if a.is_parent != b.is_parent {
@@ -1511,7 +1525,7 @@ impl Tab {
                 // `Equal` everywhere is what preserves it.
                 SortKey::Unsorted => std::cmp::Ordering::Equal,
                 SortKey::Column(column) => {
-                    let ord = compare_by(column, a, b);
+                    let ord = compare_sized(column, a, b, tree_sizes);
                     let ord = if reverse { ord.reverse() } else { ord };
                     // The secondary key, reversing independently of the primary.
                     //
@@ -1569,6 +1583,26 @@ impl Tab {
     }
 }
 
+/// [`compare_by`], except that two directories sorted by size are ordered by
+/// their measured tree sizes when `tree_sizes` is given: only when every
+/// directory in the listing has one, so the order never depends on which
+/// rows happened to have been sized.
+fn compare_sized(
+    column: ColumnId,
+    a: &Entry,
+    b: &Entry,
+    tree_sizes: Option<&std::collections::HashMap<String, u64>>,
+) -> std::cmp::Ordering {
+    if let Some(sizes) = tree_sizes
+        && matches!(column, ColumnId::Size)
+        && a.is_dir()
+        && b.is_dir()
+    {
+        return sizes.get(&a.name).cmp(&sizes.get(&b.name));
+    }
+    compare_by(column, a, b)
+}
+
 /// Compare two entries by one column's field - the **primary key only**.
 ///
 /// Every arm is a *total* order, which is what makes the surrounding
@@ -1590,7 +1624,10 @@ impl Tab {
 /// That is a decision, not an oversight. Sorting must never trigger a walk -
 /// a panel of ten thousand folders has to cost what it costs today - and a
 /// key that only the already-visited rows carry would order the panel by
-/// where the user happened to have been.
+/// where the user happened to have been. Once **every** directory in the
+/// listing has been sized (`Ctrl+Shift+L`), that objection is gone, and
+/// [`Tab::sort_entries`] orders them by their measured sizes instead; see
+/// `compare_sized`.
 ///
 /// The name tiebreak deliberately lives outside this function, in
 /// [`Tab::sort_entries`], because the primary key is what reverses and the

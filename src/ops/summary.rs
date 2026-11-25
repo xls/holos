@@ -125,6 +125,7 @@ impl JobSummary {
             JobKind::Resize => "resized",
             JobKind::Download => "downloaded",
             JobKind::LocalSend => "sent",
+            JobKind::Sync => "synchronized",
         };
         let mut out = format!(
             "{verb} {} file{}, {} dir{}",

@@ -8,6 +8,10 @@
 //! [`placement`] is the one answer both sides read, so the frame and the
 //! picture cannot disagree about where it is.
 //!
+//! The picture is either the full-screen viewer's or the quick view's
+//! (`Ctrl+Q`), whichever is on the screen; the quick view is drawn the same
+//! way, inside its panel.
+//!
 //! A box of facts sits at the top right from the start - what the format's
 //! template says, which is what mode 3 showed for an image before it drew
 //! one - and `i` (the hex mode's reading panel key) hides it. The picture is
@@ -112,16 +116,58 @@ fn viewer_body(app: &App, area: Rect) -> Rect {
     super::viewer::body_rect(super::viewer::content_area(app, area))
 }
 
-/// The pixel size the top viewer's picture is drawn at, for
-/// [`Viewer::prepare_scaled`] before the frame.
-#[must_use]
-pub fn scaled_size(app: &App, area: Rect) -> Option<(u32, u32)> {
-    let viewer = app.viewer()?;
-    if !super::viewer::is_backdrop(app) || !shows_picture(app, viewer) {
+/// Which viewer's picture is on the screen.
+///
+/// At most one ever is: the full-screen viewer hides the panels, and so the
+/// quick view in one of them, whenever it is up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Host {
+    /// The `F3` viewer, full screen.
+    Full,
+    /// The quick view (`Ctrl+Q`), drawn in a panel.
+    Quick,
+}
+
+/// The viewer whose picture this frame shows, and the body it is drawn in.
+fn hosted(app: &App, area: Rect) -> Option<(Host, &Viewer, Rect)> {
+    if super::viewer::is_backdrop(app) {
+        let viewer = app.viewer()?;
+        return shows_picture(app, viewer).then(|| (Host::Full, viewer, viewer_body(app, area)));
+    }
+    if super::console::is_backdrop(app) {
         return None;
     }
-    let (_, fitted) = layout(app, viewer, viewer_body(app, area))?;
-    Some((fitted.px_width, fitted.px_height))
+    let body = super::quick_view_body(app, area)?;
+    let viewer = app.quick_viewer()?;
+    shows_picture(app, viewer).then_some((Host::Quick, viewer, body))
+}
+
+/// The picture's pixel size this frame, and whose it is.
+fn scaled_size(app: &App, area: Rect) -> Option<(Host, u32, u32)> {
+    let (host, viewer, body) = hosted(app, area)?;
+    let (_, fitted) = layout(app, viewer, body)?;
+    Some((host, fitted.px_width, fitted.px_height))
+}
+
+/// Scale the picture on the screen to the size it is drawn at, before the
+/// frame. Nothing is done when the size has not changed.
+pub fn prepare(app: &mut App, area: Rect) {
+    let Some((host, width, height)) = scaled_size(app, area) else {
+        return;
+    };
+    let viewer = match host {
+        Host::Full => app.viewer_mut(),
+        Host::Quick => app.quick_viewer_mut(),
+    };
+    if let Some(viewer) = viewer {
+        viewer.prepare_scaled(width, height);
+    }
+}
+
+/// The scaled picture the painter sends after the frame.
+#[must_use]
+pub fn shown(app: &App, area: Rect) -> Option<&image::RgbaImage> {
+    hosted(app, area).and_then(|(_, viewer, _)| viewer.scaled_picture())
 }
 
 /// Where a picture in real pixels goes this frame, or `None` for no picture.
@@ -131,14 +177,11 @@ pub fn scaled_size(app: &App, area: Rect) -> Option<(u32, u32)> {
 /// be drawn over it after the frame.
 #[must_use]
 pub fn placement(app: &App, area: Rect) -> Option<Placement> {
-    if !app.graphics.is_pixels() || !app.viewer_is_shown() || !app.dialogs().is_empty() {
+    if !app.graphics.is_pixels() || !app.dialogs().is_empty() {
         return None;
     }
-    let viewer = app.viewer()?;
-    if !shows_picture(app, viewer) {
-        return None;
-    }
-    let (cells, fitted) = layout(app, viewer, viewer_body(app, area))?;
+    let (_, viewer, body) = hosted(app, area)?;
+    let (cells, fitted) = layout(app, viewer, body)?;
     Some(Placement {
         viewer: viewer.id().0,
         x: cells.x,

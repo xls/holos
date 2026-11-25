@@ -407,6 +407,12 @@ impl Viewer {
         self.picture_facts
     }
 
+    /// Open or close the picture's facts box. The quick view starts with it
+    /// closed: a panel is too narrow to give part of it to the box.
+    pub const fn set_picture_facts(&mut self, open: bool) {
+        self.picture_facts = open;
+    }
+
     /// Whether the reading panel is open.
     pub const fn inspecting(&self) -> bool {
         self.inspect

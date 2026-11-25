@@ -380,7 +380,14 @@ impl Viewer {
     /// Whether mode 3 shows this file as a picture.
     #[must_use]
     pub fn is_picture(&self) -> bool {
-        self.mode == ViewerMode::Render && is_image_name(&self.format_name())
+        self.mode == ViewerMode::Render && self.names_picture()
+    }
+
+    /// Whether the file's name says it is a picture this viewer can draw,
+    /// whatever mode it is in now.
+    #[must_use]
+    pub fn names_picture(&self) -> bool {
+        is_image_name(&self.format_name())
     }
 
     /// The decode this viewer is owed, handed out once.

@@ -136,11 +136,8 @@ fn the_line_editing_keys_are_the_shells() {
         &[0x15][..],
         "Esc empties the shell's line rather than being forwarded to it"
     );
-    assert_eq!(
-        app.focus,
-        Focus::CommandLine,
-        "and none of them moved focus"
-    );
+    // And the same press hands focus back to the panel: one Esc, not two.
+    assert_eq!(app.focus, Focus::Panel(app.active_side));
 }
 
 #[test]

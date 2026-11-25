@@ -62,9 +62,7 @@ fn frame(app: &mut App, w: u16, h: u16) -> Buffer {
     let rows = crate::ui::viewer::body_rows(crate::ui::viewer::content_area(app, area));
     let cols = crate::ui::viewer::body_cols(app, area);
     app.service_viewer(rows, cols);
-    if let Some((pw, ph)) = scaled_size(app, area) {
-        app.viewer_mut().unwrap().prepare_scaled(pw, ph);
-    }
+    prepare(app, area);
     let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
     // The frame's own buffer: a skipped cell never reaches the backend's.
     terminal

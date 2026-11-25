@@ -756,8 +756,10 @@ impl App {
                         dir,
                         wants_flags,
                     });
+                let sizes = self.tree_sizes_for(side, tab_index);
                 let tab = self.panel_mut(side).tab_mut(tab_index)?;
                 tab.loading = false;
+                tab.tree_sizes = sizes;
                 // A rescan reconciles its buffered rows into the visible ones
                 // now, in place; an ordinary read has already built `entries`
                 // and only needs the final sort. Either way the order is the
@@ -951,6 +953,51 @@ impl App {
         if let Some(tab) = self.panel_mut(event.side).tab_mut(event.tab) {
             tab.column_plan = event.plan;
             tab.described = event.title;
+        }
+    }
+}
+
+impl App {
+    /// The measured sizes of one tab's directory rows, out of the size cache.
+    fn tree_sizes_for(
+        &self,
+        side: Side,
+        tab_index: usize,
+    ) -> std::collections::HashMap<String, u64> {
+        let Some(tab) = self.panel(side).tab(tab_index) else {
+            return std::collections::HashMap::new();
+        };
+        tab.entries
+            .iter()
+            .filter(|e| !e.is_parent && e.is_dir())
+            .filter_map(|e| {
+                let stats = self.jobs.sizes.get(&tab.path.join(&e.name))?;
+                Some((e.name.clone(), stats.bytes))
+            })
+            .collect()
+    }
+
+    /// Give every tab the sizes measured so far, and re-sort the ones sorted
+    /// by size so a directory moves to its place as its figure arrives.
+    pub(crate) fn refresh_tree_sizes(&mut self) {
+        let directories_first = self.config.panel.directories_first;
+        for side in [Side::Left, Side::Right] {
+            for index in 0..self.panel(side).tabs().len() {
+                let sizes = self.tree_sizes_for(side, index);
+                let Some(tab) = self.panel_mut(side).tab_mut(index) else {
+                    continue;
+                };
+                if tab.tree_sizes == sizes {
+                    continue;
+                }
+                tab.tree_sizes = sizes;
+                if matches!(
+                    tab.sort.key,
+                    crate::panel::SortKey::Column(crate::panel::ColumnId::Size)
+                ) {
+                    tab.sort_entries(directories_first);
+                }
+            }
         }
     }
 }

@@ -721,14 +721,16 @@ fn readline_editing_keys_work_on_the_command_line() {
 }
 
 #[test]
-fn esc_on_the_command_line_clears_then_returns_to_the_panel() {
+fn one_esc_on_the_command_line_clears_it_and_returns_to_the_panel() {
     let mut app = app_with(&["alpha"]);
     app.set_focus(Focus::CommandLine);
     type_text(&mut app, "rm -rf /");
     press(&mut app, KeyCode::Esc, NONE);
     assert_eq!(app.cmdline.text(), "");
     assert_eq!(app.cmdline.caret(), 0, "clearing is what resets the caret");
-    assert_eq!(app.focus, Focus::CommandLine, "still here");
+    assert_eq!(app.focus, Focus::Panel(Side::Left), "one press, not two");
+    // An empty line leaves the same way.
+    app.set_focus(Focus::CommandLine);
     press(&mut app, KeyCode::Esc, NONE);
     assert_eq!(app.focus, Focus::Panel(Side::Left));
 }

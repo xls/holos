@@ -567,6 +567,9 @@ pub fn dialog_answered(app: &mut App, id: DialogId, job: Option<JobId>, result: 
         // stops looking. Either way discovery leaves with the dialog.
         (DialogId::SendDevice, DialogResult::SendTo(choice)) => app.answer_send_device(choice),
         (DialogId::SendDevice, DialogResult::None) => app.stop_device_discovery(),
+        // The sync view's question: yes runs the marked rows, no leaves the
+        // view as it was to be changed further.
+        (DialogId::Sync, DialogResult::Confirm(true)) => app.run_sync(),
         // The popup's own edits. A move hands back the whole list; the two
         // prompts it pushes act on the entry under its cursor, which cannot
         // have moved while they were up.

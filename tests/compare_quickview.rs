@@ -579,6 +579,155 @@ fn tab_moves_focus_into_the_quick_view_and_the_viewers_keys_then_apply() {
     );
 }
 
+/// A red PNG on disk, as a camera folder would hold it.
+fn red_png(w: u32, h: u32) -> Vec<u8> {
+    let img = image::RgbaImage::from_pixel(w, h, image::Rgba([255, 0, 0, 255]));
+    let mut out = Vec::new();
+    image::ImageEncoder::write_image(
+        image::codecs::png::PngEncoder::new(&mut out),
+        img.as_raw(),
+        w,
+        h,
+        image::ExtendedColorType::Rgba8,
+    )
+    .expect("a png");
+    out
+}
+
+/// A quick view over `shot.png` in the left panel, opened, decoded and laid
+/// out the way the event loop does it, on an 80x24 screen.
+fn quick_view_of_a_picture(
+    tree: &Tree,
+    protocol: holoscommander::term::graphics::Protocol,
+) -> (App, ratatui::layout::Rect) {
+    let bytes = red_png(40, 20);
+    tree.file("shot.png", &bytes);
+    let mut app = app_with(Config::default());
+    app.graphics = protocol;
+    app.cell_px = (10, 20);
+    seed(
+        &mut app,
+        Side::Left,
+        tree.root(),
+        vec![file("shot.png", bytes.len() as u64, 1)],
+    );
+    app.quick_view_toggle();
+    expire_debounce(&mut app);
+    let area = ratatui::layout::Rect::new(0, 0, 80, 24);
+    holoscommander::ui::sync_view_rows(&mut app, area);
+    app.service_quick_view(Instant::now());
+    let job = app
+        .quick_viewer_mut()
+        .and_then(holoscommander::viewer::Viewer::take_image_job)
+        .expect("the quick view asks for the picture to be decoded");
+    assert!(app.apply_image_batch(&holoscommander::viewer::image::decode(job)));
+    holoscommander::ui::image::prepare(&mut app, area);
+    (app, area)
+}
+
+/// Moving down a folder of photos shows each one in the other panel, as the
+/// picture rather than its bytes.
+#[test]
+fn a_picture_under_the_cursor_is_drawn_in_the_quick_view() {
+    use holoscommander::term::graphics::Protocol;
+
+    let tree = Tree::new("picture");
+    let (app, area) = quick_view_of_a_picture(&tree, Protocol::Halfblocks);
+    let backend = ratatui::backend::TestBackend::new(area.width, area.height);
+    let mut term = ratatui::Terminal::new(backend).expect("a test terminal");
+    term.draw(|f| holoscommander::ui::draw(f, &app))
+        .expect("the frame is drawn");
+    let buf = term.backend().buffer();
+    let red: Vec<u16> = (0..area.height)
+        .flat_map(|y| (0..area.width).map(move |x| (x, y)))
+        .filter(|&(x, y)| {
+            buf.cell((x, y)).is_some_and(|c| {
+                c.symbol() == "\u{2580}" && c.fg == ratatui::style::Color::Rgb(255, 0, 0)
+            })
+        })
+        .map(|(x, _)| x)
+        .collect();
+    assert!(
+        !red.is_empty(),
+        "half blocks in the picture's red:\n{}",
+        dump(buf)
+    );
+    assert!(
+        red.iter().all(|&x| x >= area.width / 2),
+        "all of them in the right panel, the one showing the quick view"
+    );
+}
+
+/// A terminal with real pixels gets the picture placed inside the quick
+/// view's panel, and nothing once the quick view is closed.
+#[test]
+fn a_kitty_picture_is_placed_inside_the_quick_view_panel() {
+    use holoscommander::term::graphics::Protocol;
+
+    let tree = Tree::new("kitty");
+    let (mut app, area) = quick_view_of_a_picture(&tree, Protocol::Kitty);
+    let place = holoscommander::ui::image::placement(&app, area).expect("a picture to send");
+    assert!(place.x >= area.width / 2, "in the right panel: {place:?}");
+    assert!(place.x + place.cols <= area.width);
+    assert!(holoscommander::ui::image::shown(&app, area).is_some());
+
+    app.quick_view_toggle();
+    assert!(holoscommander::ui::image::placement(&app, area).is_none());
+}
+
+/// The panel showing the quick view is titled with the folder the file is
+/// in - the other panel's - and its header row with the file's name.
+#[test]
+fn the_quick_view_panel_names_the_folder_of_the_file_it_shows() {
+    use holoscommander::term::graphics::Protocol;
+
+    let tree = Tree::new("titled");
+    let (app, area) = quick_view_of_a_picture(&tree, Protocol::Halfblocks);
+    let backend = ratatui::backend::TestBackend::new(area.width, area.height);
+    let mut term = ratatui::Terminal::new(backend).expect("a test terminal");
+    term.draw(|f| holoscommander::ui::draw(f, &app))
+        .expect("the frame is drawn");
+    let screen = dump(term.backend().buffer());
+    let lines: Vec<&str> = screen.lines().collect();
+    let half = |line: &str| {
+        line.chars()
+            .skip(usize::from(area.width / 2))
+            .collect::<String>()
+    };
+    let top = half(lines[0]);
+    assert!(
+        top.contains("titled"),
+        "the right border names the left folder: {top}"
+    );
+    let header = half(lines[1]);
+    assert!(header.contains("shot.png"), "{header}");
+    assert!(
+        !header.contains("titled"),
+        "the name, not the path: {header}"
+    );
+    assert!(
+        header.contains("40 x 20 PNG"),
+        "and the picture's facts: {header}"
+    );
+}
+
+/// The Info box the full-screen viewer opens with stays closed in a panel,
+/// so the picture gets all of it.
+#[test]
+fn the_quick_view_shows_the_picture_without_its_info_box() {
+    use holoscommander::term::graphics::Protocol;
+
+    let tree = Tree::new("noinfo");
+    let (app, area) = quick_view_of_a_picture(&tree, Protocol::Halfblocks);
+    let backend = ratatui::backend::TestBackend::new(area.width, area.height);
+    let mut term = ratatui::Terminal::new(backend).expect("a test terminal");
+    term.draw(|f| holoscommander::ui::draw(f, &app))
+        .expect("the frame is drawn");
+    let screen = dump(term.backend().buffer());
+    assert!(!screen.contains("File size"), "{screen}");
+    assert!(!screen.contains(" Info "), "{screen}");
+}
+
 fn expire_debounce(app: &mut App) {
     let Some(quick) = app.quick.as_deref_mut() else {
         return;
@@ -644,10 +793,17 @@ fn a_quick_view_renders_at_every_size_in_both_border_modes() {
                         "ascii={ascii} {w}x{h} row={row}:\n{out}"
                     );
                 } else if row == 1 {
-                    // The directory body: its own path in the header, whether
-                    // or not the size walk has answered yet.
+                    // The directory body: its name in the header, whether or
+                    // not the size walk has answered yet.
+                    let header: String = out
+                        .lines()
+                        .nth(1)
+                        .unwrap_or_default()
+                        .chars()
+                        .skip(usize::from(w / 2))
+                        .collect();
                     assert!(
-                        out.contains("/sub"),
+                        header.contains("sub"),
                         "ascii={ascii} {w}x{h}: no directory body:\n{out}"
                     );
                 } else {

@@ -77,7 +77,7 @@
 //!
 //! It survives focus leaving and returning, and it is where `Ctrl+Enter`
 //! inserts. It resets to 0 only when the line is cleared - by
-//! `Esc` on an empty line, or by running the command.
+//! `Esc`, which also hands focus back to the panel, or by running the command.
 
 use unicode_width::UnicodeWidthStr;
 

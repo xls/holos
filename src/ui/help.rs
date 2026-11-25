@@ -63,76 +63,12 @@ const VIEWER_HEADING: &str = "Viewer keys";
 /// The heading the console section starts with.
 const CONSOLE_HEADING: &str = "Console";
 
-/// The heading the dialogs section starts with.
-const DIALOGS_HEADING: &str = "Dialogs";
-
 /// How wide the key column of a generated table is, at most.
 ///
 /// A binding marked `(unavailable)` on a legacy terminal is long; letting it
 /// set the column width would indent every other row off the screen at 60
 /// columns (the floor).
 const KEY_COLUMN_MAX: usize = 34;
-
-/// The dialogs the `Dialogs` section documents, in the order they appear.
-///
-/// A list beside the exhaustive `match` in [`dialog_help`] rather than instead
-/// of it: the `match` is what makes a new [`DialogId`] a compile error, and
-/// this is what puts the paragraphs in a sensible order rather than in
-/// declaration order. Adding a variant means adding an arm there and an entry
-/// here.
-const DIALOG_ORDER: &[DialogId] = &[
-    DialogId::Help,
-    DialogId::Message,
-    DialogId::ConfirmQuit,
-    DialogId::GotoPath,
-    DialogId::GotoOffset,
-    DialogId::Mkdir,
-    DialogId::MkdirForTarget,
-    DialogId::Rename,
-    DialogId::EditNew,
-    DialogId::SelectMask,
-    DialogId::UnselectMask,
-    DialogId::CopyMove,
-    DialogId::Conflict,
-    DialogId::ConfirmDelete,
-    DialogId::ConfirmRewrite,
-    DialogId::Progress,
-    DialogId::JobQueue,
-    DialogId::JobSummary,
-    DialogId::Pack,
-    DialogId::Resize,
-    DialogId::MultiRename,
-    DialogId::RenameResult,
-    DialogId::Find,
-    DialogId::SaveSearch,
-    DialogId::ConfirmRemoteSearch,
-    DialogId::Drive(Side::Left),
-    DialogId::Drive(Side::Right),
-    DialogId::Hotlist,
-    DialogId::HotlistAdd,
-    DialogId::HotlistRemove,
-    DialogId::HotlistRename,
-    DialogId::Download,
-    DialogId::DownloadLink,
-    DialogId::SelfUpdate,
-    DialogId::Restart,
-    DialogId::Serve,
-    DialogId::SendDevice,
-    DialogId::Menu,
-    DialogId::ContextMenu,
-    DialogId::Execute,
-    DialogId::OpenWith,
-    DialogId::History,
-    DialogId::Theme,
-    DialogId::Template,
-    DialogId::FileSummary,
-    DialogId::Connect,
-    DialogId::HostForm,
-    DialogId::RemoteSecret,
-    DialogId::HostKey,
-    DialogId::HostKeyChanged,
-    DialogId::ConfirmDisconnect,
-];
 
 /// The whole help document, and the line the topic starts on.
 ///
@@ -143,10 +79,6 @@ const DIALOG_ORDER: &[DialogId] = &[
 pub fn page(app: &App, topic: HelpTopic) -> (String, Option<u64>) {
     let mut lines: Vec<String> = Vec::new();
     extend(&mut lines, &keyboard_page(app));
-    extend(&mut lines, &getting_started());
-
-    let dialogs_at = lines.len();
-    extend(&mut lines, &dialogs_page());
     extend(&mut lines, &console_page());
     extend(&mut lines, &remote_page());
     extend(&mut lines, &configuration_page(app));
@@ -157,9 +89,9 @@ pub fn page(app: &App, topic: HelpTopic) -> (String, Option<u64>) {
         HelpTopic::Keyboard => None,
         HelpTopic::Viewer => line_starting_with(&lines, VIEWER_HEADING),
         HelpTopic::Console => line_starting_with(&lines, CONSOLE_HEADING),
-        HelpTopic::Dialog(id) => dialog_offset(id)
-            .map(|offset| offset.saturating_add(dialogs_at))
-            .and_then(|line| u64::try_from(line).ok()),
+        // `F1` in a dialog opens that dialog's own paragraph in a box over it
+        // (see `input::dialogs`), so the page has no section to land on.
+        HelpTopic::Dialog(_) => None,
     };
     (body, at)
 }
@@ -262,81 +194,6 @@ pub fn keyboard_page(app: &App) -> String {
     //
     out.push_str(&viewer_page(keymap, enhanced));
     out.push('\n');
-    out
-}
-
-/// the "Getting started": the two-panel model, marking, the
-/// command-line focus rules.
-pub fn getting_started() -> String {
-    let mut out = String::from("Getting started\n\n");
-    out.push_str(
-        "Two panels, one of them active. Tab moves between them. Almost every\n\
-         operation reads the active panel as the source and the other as the\n\
-         target: F5 copies from here to there, F6 moves, and swapping the two\n\
-         with Ctrl+U reverses that without retyping anything.\n\n",
-    );
-    out.push_str(
-        "Marking is not the cursor. Insert marks the entry under the cursor and\n\
-         steps down, Space marks it and sizes a directory, and + - * mark,\n\
-         unmark and invert by wildcard. An operation acts on the marks when\n\
-         there are any and on the entry under the cursor when there are none,\n\
- so nothing is ever done to a selection you cannot see.\n\n",
-    );
-    out.push_str(
-        "Typing in a panel is quick search, not a command: the cursor jumps to\n\
-         the first entry that matches what you have typed, Down and Up move to\n\
-         the next and previous match, Backspace shortens what you typed, and\n\
-         Esc clears the search before it clears the marks.\n\n",
-    );
-    out.push_str(
-        "The command line is below the panels and keeps its own caret. Typing a\n\
-         character with the panel focused starts a quick search; typing where\n\
-         the command line has focus types there. One focus rule is worth\n\
-         knowing: Up and Down always belong to the panel, which is why history\n\
-         is on Ctrl+Up and Ctrl+Down.\n\n",
-    );
-    out
-}
-
-/// the "Dialogs": `Tab`, `Esc`, `Enter`, and the `Alt`
-/// mnemonics with the four reserved letters, then one paragraph per dialog.
-pub fn dialogs_page() -> String {
-    let mut out = String::from(DIALOGS_HEADING);
-    out.push_str("\n\n");
-    out.push_str(
-        "Every dialog works the same way. Tab and Shift+Tab move between its\n\
-         controls, Enter accepts, Esc cancels, and a dialog consumes all input\n\
-         while it is open - no key leaks through to the panel behind it\n\
-.\n\n",
-    );
-    out.push_str(
-        "Alt with a letter jumps straight to a control, and the letter is drawn\n\
-         underlined in that control's own label so it never has to be guessed.\n\
-         An accelerator never turns anything off: Alt on a checkbox switches it\n\
-         on and leaves it on, because a key that toggled would make a repeated\n\
- keystroke destructive.\n\n",
-    );
-    out.push_str(
-        "Four letters mean the same thing everywhere they appear: n is Cancel\n\
-         or No, c is Close, h is Help and o is OK. A dialog that spends one of\n\
-         them on something else has no button of that kind at all, and every\n\
-         such case is written down and tested.\n\n",
-    );
-    out.push_str(
-        "Alt with a digit is never a mnemonic: it belongs to the tab strip, so\n\
- the two can never collide.\n\n",
-    );
-    for id in DIALOG_ORDER {
-        let (title, body) = dialog_help(*id);
-        out.push_str(title);
-        out.push('\n');
-        for line in body.lines() {
-            out.push_str("  ");
-            out.push_str(line);
-            out.push('\n');
-        }
-        out.push('\n');
-    }
     out
 }
 
@@ -855,7 +712,7 @@ const SORT_SECONDARY: [Action; 9] = [
 ///
 /// An exhaustive `match`, which is what makes a new [`DialogId`] a compile
 /// error here rather than a dialog with no help. A new variant needs an arm
-/// here **and** an entry in [`DIALOG_ORDER`].
+/// here; `F1` in that dialog shows it.
 pub fn dialog_help_text(id: DialogId) -> (&'static str, &'static str) {
     dialog_help(id)
 }
@@ -1027,6 +884,22 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
              compression; and a prefix and postfix for the new names. The\n\
              images are written into the other panel's directory, and a name\n\
              already there goes through the usual conflict dialog.",
+        ),
+        DialogId::Sync => (
+            "Synchronize",
+            "Ctrl+Alt+S shows the two panels' directories side by side, compared\n\
+             all the way down, one row per file, and a column beside the middle\n\
+             border says what will happen: an arrow on the side that receives\n\
+             the file, x on the side it is trashed from, = the same on both,\n\
+             != different with no newer side. Files that\n\
+             differ start marked; Space or Ins unmarks one, Left and Right point\n\
+             it the other way. Alt+M (or Shift+F5) steps the mode - one way,\n\
+             both ways, mirror - and the arrows change with it; one way and\n\
+             mirror go from the panel with focus, so Tab turns them round. F5 runs what is shown, after this question. = shows\n\
+             identical files. Alt+C checks bytes: files that the size and date\n\
+             call the same are read on both sides and compared, which catches a\n\
+             file changed without its size or date changing; slower, so off\n\
+             until asked for. Esc leaves.",
         ),
         DialogId::MultiRename => (
             "Multi-rename",
@@ -1295,26 +1168,6 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
             "Ctrl+F on a panel that is already connected.",
         ),
     }
-}
-
-/// How far into [`dialogs_page`] a dialog's paragraph starts.
-///
-/// Computed from the same list and the same renderer the page is built from,
-/// so the two cannot drift apart.
-fn dialog_offset(id: DialogId) -> Option<usize> {
-    let page = dialogs_page();
-    let mut wanted = String::new();
-    for candidate in DIALOG_ORDER {
-        let (title, _) = dialog_help(*candidate);
-        if *candidate == id {
-            wanted = title.to_string();
-            break;
-        }
-    }
-    if wanted.is_empty() {
-        return None;
-    }
-    page.lines().position(|line| line == wanted)
 }
 
 /// The first line that starts with `heading`.
@@ -1752,8 +1605,6 @@ mod tests {
         assert_eq!(at, None, "the keyboard page is the top of the document");
         for heading in [
             "Keyboard reference",
-            "Getting started",
-            DIALOGS_HEADING,
             CONSOLE_HEADING,
             "Remote connections",
             "Configuration",
@@ -1765,6 +1616,11 @@ mod tests {
                 "{heading} missing from the document"
             );
         }
+
+        // Gone at the owner's request: prose nobody read, and every dialog
+        // explains itself on `F1` anyway.
+        assert!(!body.contains("Getting started"));
+        assert!(!body.lines().any(|line| line == "Dialogs"));
 
         let lines: Vec<&str> = body.lines().collect();
         for (topic, expected) in [
@@ -1781,33 +1637,6 @@ mod tests {
                 "{topic:?} landed on {:?}",
                 lines.get(index)
             );
-        }
-    }
-
-    #[test]
-    fn f1_in_a_dialog_lands_on_that_dialogs_paragraph() {
-        // "`F1` inside a dialog opens that dialog's page."
-        let app = app();
-        for id in DIALOG_ORDER {
-            let (body, at) = page(&app, HelpTopic::Dialog(*id));
-            let line = at.unwrap_or_else(|| panic!("{} has no line", id.id()));
-            let index = usize::try_from(line).expect("a line fits");
-            let (title, _) = dialog_help(*id);
-            assert_eq!(
-                body.lines().nth(index),
-                Some(title),
-                "{} landed somewhere else",
-                id.id()
-            );
-        }
-    }
-
-    #[test]
-    fn every_dialog_paragraph_is_listed_once() {
-        let mut seen: Vec<DialogId> = Vec::new();
-        for id in DIALOG_ORDER {
-            assert!(!seen.contains(id), "{} is listed twice", id.id());
-            seen.push(*id);
         }
     }
 

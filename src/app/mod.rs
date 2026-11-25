@@ -34,6 +34,8 @@ pub mod restart;
 pub mod search;
 pub mod serve;
 pub mod settings;
+pub mod sync;
+pub mod sync_view;
 pub mod update;
 pub mod viewer;
 
@@ -832,6 +834,8 @@ pub struct App {
     /// The `Alt+X` send: what was asked for and the discovery while
     /// its picker is up.
     pub localsend: crate::app::localsend::LocalSending,
+    /// `Ctrl+Alt+S`: the scan behind the sync dialog.
+    pub sync: crate::app::sync::Syncing,
     /// The file this session is about to hand to something outside itself.
     ///
     pub handoff: crate::ops::open::Handoff,
@@ -1022,6 +1026,7 @@ impl App {
             downloads: crate::app::downloads::Downloads::default(),
             serving: crate::app::serve::Serving::default(),
             localsend: crate::app::localsend::LocalSending::default(),
+            sync: crate::app::sync::Syncing::default(),
             handoff: crate::ops::open::Handoff::default(),
             pending_file_info: None,
             pending_clipboard: None,

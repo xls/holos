@@ -253,7 +253,13 @@ impl App {
     /// Offered to every viewer on the stack, as a line-index batch is: the
     /// help page may have been opened over the picture while it decoded.
     pub fn apply_image_batch(&mut self, batch: &crate::viewer::image::ImageBatch) -> bool {
-        self.viewers.apply_image(batch)
+        if self.viewers.apply_image(batch) {
+            return true;
+        }
+        // A decode for a quick view the cursor has since left belongs to no
+        // one and is dropped here.
+        self.quick_viewer_mut()
+            .is_some_and(|viewer| viewer.apply_image(batch))
     }
 
     /// Apply one batch from a background match counter.

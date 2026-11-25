@@ -138,7 +138,13 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         return;
     };
     if let Some(viewer) = quick.viewer.as_ref() {
-        super::viewer::draw_body(f, app, viewer, area);
+        // A picture is drawn the way the full-screen viewer draws one, so
+        // moving down a folder of photos shows each in turn.
+        if super::image::shows_picture(app, viewer) {
+            super::image::draw(f, app, viewer, area);
+        } else {
+            super::viewer::draw_body(f, app, viewer, area);
+        }
         return;
     }
     // Everything else is one short paragraph in the middle of the body: a
@@ -165,24 +171,44 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(body).style(bg), area);
 }
 
-/// The header row's text: the file being viewed, or the directory being
-/// walked.
-///
-/// Middle-cropped, so the name survives a narrow panel: the head of a path is
-/// the part every row shares and the tail is the part that says which file
-/// this is.
+/// The header row's text: the name of the file being viewed, or of the
+/// directory being walked. The panel's border names the folder it is in,
+/// the other panel's, so the name alone is what this row adds.
 pub fn header(app: &App) -> String {
     let Some(quick) = app.quick.as_deref() else {
         return String::new();
     };
-    if let Some(viewer) = quick.viewer.as_ref() {
-        return viewer.title().to_string();
-    }
+    // The name alone: the border above already names the folder it is in.
+    let name = |path: &VfsPath| path.file_name().unwrap_or_else(|| path.to_string());
     match (quick.subject.as_ref(), quick.pending.as_ref()) {
-        (Some(path), _) => path.to_string(),
-        (None, Some(pending)) => pending.path.to_string(),
-        (None, None) => String::new(),
+        (Some(path), _) => name(path),
+        (None, Some(pending)) => name(&pending.path),
+        (None, None) => quick
+            .viewer
+            .as_ref()
+            .map(|viewer| viewer.title().to_string())
+            .unwrap_or_default(),
     }
+}
+
+/// What the header row says about the file beside its name: a picture's
+/// pixel size and format, and the file's size. Empty for a directory, whose
+/// figures are in the status row, and while nothing is open.
+pub fn header_facts(app: &App) -> String {
+    let Some(viewer) = app.quick.as_deref().and_then(|q| q.viewer.as_ref()) else {
+        return String::new();
+    };
+    let size = viewer
+        .len()
+        .map(|len| format::status_size(len, &app.config.panel));
+    let picture = viewer
+        .picture()
+        .map(|p| format!("{} x {} {}", p.width, p.height, p.format));
+    [picture, size]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("  ")
 }
 
 /// The status row's text: the viewer's own status fitted to a panel's width
@@ -330,6 +356,6 @@ mod tests {
             is_dir: false,
         });
         app.quick = Some(Box::new(quick));
-        assert_eq!(header(&app), "/home/t/notes.txt");
+        assert_eq!(header(&app), "notes.txt");
     }
 }

@@ -191,12 +191,21 @@ pub fn draw(f: &mut Frame, app: &App, side: Side, area: Rect) {
     // The path wins the space it needs: a panel that cannot tell you which
     // directory it is showing is useless, whereas free space is a nicety.
     let inner = usize::from(area.width).saturating_sub(2);
-    let path_text = path_title(panel, g);
+    // A panel showing a quick view names the folder of the file it shows,
+    // which is the other panel's: its own path would label the picture with
+    // a directory it is not in.
+    let (titled, titled_tab) = if app.quick_view_side() == Some(side) {
+        let followed = app.panel(side.other());
+        (followed, followed.active_tab())
+    } else {
+        (panel, tab)
+    };
+    let path_text = path_title(titled, g);
     // ` path ` + ` volume ` - four cells of padding, plus a gap between them.
     let spare = inner
         .saturating_sub(text::width(&path_text))
         .saturating_sub(5);
-    let volume_text = volume_title(tab, spare, g);
+    let volume_text = volume_title(titled_tab, spare, g);
     let both_fit = !volume_text.is_empty();
     let path_room = if both_fit {
         inner
@@ -276,13 +285,27 @@ fn draw_quick_header(f: &mut Frame, app: &App, area: Rect, g: Glyphs) {
     let style = Style::new()
         .fg(color(theme.panel.header_fg))
         .bg(color(theme.panel.header_bg));
-    let text = text::fit_left(
+    // The name on the left, its facts on the right; the facts give way first
+    // when the panel is too narrow for both.
+    let width = usize::from(area.width);
+    let facts = quickview::header_facts(app);
+    let facts_room = text::width(&facts).saturating_add(2);
+    let (name_room, facts) = if facts.is_empty() || facts_room.saturating_add(8) > width {
+        (width, String::new())
+    } else {
+        (width.saturating_sub(facts_room), facts)
+    };
+    let name = text::fit_left(
         &quickview::header(app),
-        usize::from(area.width),
+        name_room,
         Crop::Middle,
         g.ellipsis(),
     );
-    f.render_widget(Paragraph::new(Line::from(Span::styled(text, style))), area);
+    let line = format!(
+        "{name}{facts:>room$}",
+        room = width.saturating_sub(name_room)
+    );
+    f.render_widget(Paragraph::new(Line::from(Span::styled(line, style))), area);
 }
 
 /// The quick view's status row: the viewer's own status, fitted to a panel's

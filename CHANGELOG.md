@@ -2,6 +2,15 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.10
+
+- `Ctrl+Alt+S` synchronizes the two panels' directories, on any backend: both panels list the two trees row for row, what differs starts marked, and a column beside the middle border shows what will be copied or trashed. `Alt+M` steps one way, both ways and mirror, `Tab` turns the direction round, `Alt+C` also checks bytes, and `F5` runs it after asking.
+- Quick view (`Ctrl+Q`) draws a picture under the cursor, with its size and format in the header; the panel's border names the folder the file is in.
+- `Ctrl+Shift+L` (or `Alt+Z`) sizes every directory in the listing; sorted by size, the biggest come first.
+- One `Esc` clears the command line and returns to the panel.
+- `Ctrl+Alt+Enter` also puts the full path on the command line, for terminals that keep `Ctrl+Shift+Enter`.
+- The `F1` page loses its Getting started and Dialogs sections; `F1` in a dialog still explains that dialog.
+
 ## v0.17.9
 
 - The macOS builds and the `.deb`, `.rpm` and Arch packages for everything in v0.17.8, which GitHub's retired `macos-14` runner kept from being built.

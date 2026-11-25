@@ -49,6 +49,9 @@ compare_dirs_content = ["ctrl+shift+f2"]
 git_history       = ["alt+v"]
 # ctrl+f2 is the column-2 sort (see below), so comparing two files is here.
 compare_files     = ["ctrl+alt+c"]
+# The two panels' directories compared all the way down, and the differences
+# copied. Total Commander has no default key for it; s for sync.
+sync_dirs         = ["ctrl+alt+s"]
 # Checksums. The extension of the name you give chooses the digest, so there is
 # one key rather than one per algorithm; verify runs on a .sha256 or .sfv under
 # the cursor and needs no dialog at all.
@@ -127,6 +130,11 @@ show_hidden       = ["ctrl+h", "alt+period"]
 # Toggle: connects a local panel, prompts to disconnect a connected one.
 connect_toggle    = ["ctrl+f"]
 dir_size          = ["ctrl+l"]
+# Every directory in the listing (Total Commander's alt+shift+enter, moved
+# off Enter so it is not one modifier away from putting a path on the command
+# line). Sort by size afterwards and the biggest come to the top. A legacy
+# terminal sends ctrl+shift+l as ctrl+l, so alt+z stands in.
+size_all          = ["ctrl+shift+l", "alt+z"]
 branch_view       = ["ctrl+b"]
 multi_rename      = ["ctrl+m"]
 # search results are a panel, so alt+shift+f7 searches within
@@ -244,7 +252,9 @@ cursor_page_up    = ["pgup"]
 cursor_page_down  = ["pgdn"]
 cursor_top        = ["home"]
 cursor_bottom     = ["end"]
-put_selected_path = ["ctrl+shift+enter", "alt+y"]
+# ctrl+alt+enter as well: some desktops (Omarchy among them) keep
+# ctrl+shift+enter for themselves, so it never arrives.
+put_selected_path = ["ctrl+shift+enter", "ctrl+alt+enter", "alt+y"]
 # Always opens with the associated application, never executes -- so
 # shift+enter on a script opens it in an editor instead of running it.
 open_with         = ["shift+enter"]
@@ -329,7 +339,9 @@ caret_right       = ["right"]
 caret_backspace   = ["backspace"]
 caret_delete      = ["delete"]
 toggle_overwrite  = ["insert"]
-put_selected_path = ["ctrl+shift+enter", "alt+y"]
+# ctrl+alt+enter as well: some desktops (Omarchy among them) keep
+# ctrl+shift+enter for themselves, so it never arrives.
+put_selected_path = ["ctrl+shift+enter", "ctrl+alt+enter", "alt+y"]
 
 # Ctrl+O hides the panels and gives the shell the whole screen.
 # Almost nothing is bound here on purpose: a program running in there -- vim,

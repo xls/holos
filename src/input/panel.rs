@@ -219,6 +219,29 @@ pub(super) fn size_selection(app: &mut App) {
     }
 }
 
+/// `Ctrl+Shift+L`: size every directory in the listing, as Total
+/// Commander's `Alt+Shift+Enter` does. With the panel sorted by size the directories then take
+/// their places as each figure arrives, which is the disk-usage view: the
+/// biggest at one end, and `Enter` goes into it.
+pub(super) fn size_all(app: &mut App) {
+    let tab = app.active_panel().active_tab();
+    // Every directory, filtered out of view or not: sorting by the measured
+    // sizes needs all of them.
+    let paths: Vec<VfsPath> = tab
+        .entries
+        .iter()
+        .filter(|e| !e.is_parent && e.is_dir())
+        .map(|e| tab.path.join(&e.name))
+        .collect();
+    if paths.is_empty() {
+        app.message = Some("no directories here to size".to_string());
+        return;
+    }
+    if app.request_size(paths).is_none() {
+        app.message = Some("every directory here is already sized".to_string());
+    }
+}
+
 /// `+` / `-`: open the mask prompt.
 ///
 /// All three of the prompt's controls "persist for the session" and the mask is shared

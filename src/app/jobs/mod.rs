@@ -417,6 +417,9 @@ impl App {
             for (path, stats) in &summary.sized {
                 self.jobs.sizes.insert(path.clone(), *stats);
             }
+            if !summary.sized.is_empty() {
+                self.refresh_tree_sizes();
+            }
             self.jobs.drop_handle(id);
         }
     }
@@ -537,6 +540,7 @@ impl App {
                 | JobKind::Delete { .. }
                 | JobKind::Compare
                 | JobKind::Resize
+                | JobKind::Sync
         )
     }
 
@@ -919,6 +923,125 @@ mod tests {
             app.take_pending_jobs().is_empty(),
             "draining is destructive"
         );
+    }
+
+    /// A listing of two directories and a file under `/root`, sorted by size
+    /// with the biggest first, as a disk-usage look starts.
+    fn sized_listing() -> App {
+        let mut app = App::headless(Config::default(), Keymap::builtin(), Theme::blue());
+        let tab = app.left.active_tab_mut();
+        tab.path = VfsPath::local("/root");
+        tab.entries = vec![
+            crate::vfs::Entry::dir("alpha"),
+            crate::vfs::Entry::dir("beta"),
+            crate::vfs::Entry::file("notes.txt"),
+        ];
+        tab.sort.key = crate::panel::SortKey::Column(crate::panel::ColumnId::Size);
+        tab.sort.reverse = true;
+        tab.sort_entries(true);
+        assert!(app.config.panel.directories_first, "directories on top");
+        app
+    }
+
+    fn finish_sizes(app: &mut App, id: JobId, sized: Vec<(VfsPath, u64)>) {
+        let sized = sized
+            .into_iter()
+            .map(|(path, bytes)| {
+                (
+                    path,
+                    crate::ops::TreeStats {
+                        bytes,
+                        files: 1,
+                        dirs: 0,
+                    },
+                )
+            })
+            .collect();
+        app.apply_job_event(JobUpdate {
+            id,
+            event: JobEvent::Finished {
+                summary: Box::new(crate::ops::JobSummary {
+                    kind: JobKind::Size,
+                    files_done: 0,
+                    dirs_done: 0,
+                    bytes_done: 0,
+                    skipped: 0,
+                    failures: Vec::new(),
+                    cancelled: false,
+                    elapsed: std::time::Duration::ZERO,
+                    sized,
+                    differing: Vec::new(),
+                    first_difference: None,
+                }),
+            },
+        });
+    }
+
+    fn names(app: &App) -> Vec<String> {
+        app.left
+            .active_tab()
+            .entries
+            .iter()
+            .map(|e| e.name.clone())
+            .collect()
+    }
+
+    #[test]
+    fn ctrl_shift_l_sizes_every_directory_and_the_biggest_comes_first() {
+        use crate::input::{KeyCode, KeyEvent, KeyModifiers, dispatch};
+        let mut app = sized_listing();
+        assert_eq!(
+            names(&app),
+            ["alpha", "beta", "notes.txt"],
+            "by name until sized"
+        );
+
+        dispatch(
+            &mut app,
+            KeyEvent::new(
+                KeyCode::Char('l'),
+                KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+            ),
+        )
+        .unwrap();
+        let queued = app.take_pending_jobs();
+        assert_eq!(queued.len(), 1, "one walk over the lot");
+        assert_eq!(
+            queued[0].spec.sources,
+            vec![VfsPath::local("/root/alpha"), VfsPath::local("/root/beta")]
+        );
+
+        finish_sizes(
+            &mut app,
+            queued[0].id,
+            vec![
+                (VfsPath::local("/root/alpha"), 10),
+                (VfsPath::local("/root/beta"), 9_000),
+            ],
+        );
+        assert_eq!(names(&app), ["beta", "alpha", "notes.txt"]);
+
+        // A second press has nothing left to walk, and says so.
+        dispatch(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('z'), KeyModifiers::ALT),
+        )
+        .unwrap();
+        assert!(app.take_pending_jobs().is_empty());
+        assert_eq!(
+            app.message.as_deref(),
+            Some("every directory here is already sized")
+        );
+    }
+
+    #[test]
+    fn one_directory_sized_with_space_does_not_reorder_the_rest() {
+        // Sorting by where the user happened to have been is what the size
+        // sort refuses: only a fully sized listing orders its directories.
+        let mut app = sized_listing();
+        let id = app.request_job(JobSpec::size(vec![VfsPath::local("/root/beta")]));
+        finish_sizes(&mut app, id, vec![(VfsPath::local("/root/beta"), 9_000)]);
+        assert_eq!(names(&app), ["alpha", "beta", "notes.txt"]);
     }
 
     #[test]

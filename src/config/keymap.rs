@@ -1126,6 +1126,15 @@ mod tests {
                 Resolution::Action(Action::PutSelectedPath),
                 "{ctx:?}"
             );
+            // For a desktop that keeps ctrl+shift+enter, as Omarchy does.
+            assert_eq!(
+                km.resolve(
+                    ctx,
+                    press(KeyCode::Enter, KeyModifiers::CONTROL | KeyModifiers::ALT)
+                ),
+                Resolution::Action(Action::PutSelectedPath),
+                "{ctx:?}"
+            );
         }
     }
 

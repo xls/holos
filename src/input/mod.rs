@@ -55,6 +55,7 @@ pub mod keyboard;
 pub mod panel;
 pub mod quicksearch;
 pub mod search;
+mod sync;
 pub mod viewer;
 
 pub use action::{Action, Milestone};
@@ -214,6 +215,8 @@ pub enum DialogId {
     FileSummary,
     /// `Shift+R`: resize and convert the marked images.
     Resize,
+    /// The sync view's "synchronize these?" question.
+    Sync,
 }
 
 impl DialogId {
@@ -277,6 +280,7 @@ impl DialogId {
             Self::Template => "template",
             Self::FileSummary => "file_summary",
             Self::Resize => "resize",
+            Self::Sync => "sync",
         }
     }
 }
@@ -384,6 +388,12 @@ pub fn dispatch(app: &mut App, key: KeyEvent) -> Result<()> {
         && app.quick_view_side() == Some(side)
     {
         return viewer::quick_view_key(app, press);
+    }
+
+    // the sync view: both panels show it, so a panel key means the
+    // view's version of it. See `sync`.
+    if matches!(app.focus, Focus::Panel(_)) && app.sync_view().is_some() {
+        return sync::sync_key(app, press);
     }
 
     // with a live shell the command line **is** the shell's own
@@ -1089,6 +1099,7 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         A::Resize => files::open_resize(app),
         A::CopyPath => files::copy_paths(app),
         A::DirSize => panel::size_selection(app),
+        A::SizeAll => panel::size_all(app),
         // `+` and `-` open the same prompt in opposite directions, offering
         // the last mask of the session.
         A::SelectMask => panel::open_mask_prompt(app, DialogId::SelectMask),
@@ -1206,18 +1217,16 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         A::KillToEnd => app.cmdline.kill_to_end(),
         A::ToggleOverwrite => app.cmdline.overwrite = !app.cmdline.overwrite,
         A::Clear => {
-            // Esc clears the line; if it is already empty, focus returns to
-            // the panel. Clearing is also the only thing that resets the
-            // caret.
+            // One Esc clears the line and gives focus back to the panel: the
+            // owner found a second press to leave an emptied line was one too
+            // many. Clearing is also the only thing that resets the caret.
             //
             // `clear_command_line` is the same function the panel's own Esc
-            // uses, so one key means one thing in both places and the shell
-            // case is handled once: with a live shell the text belongs to the
-            // shell and is emptied with a kill-line, not by clearing a buffer
-            // here that the shell is not reading from.
-            if !panel::clear_command_line(app) {
-                app.set_focus(Focus::Panel(app.active_side));
-            }
+            // uses, so the shell case is handled once: with a live shell the
+            // text belongs to the shell and is emptied with a kill-line, not
+            // by clearing a buffer here that the shell is not reading from.
+            panel::clear_command_line(app);
+            app.set_focus(Focus::Panel(app.active_side));
         }
         // the design makes history the shell's: "History, completion,
         // `Ctrl+R`, vi or emacs bindings … all of it is whatever the user has
@@ -1329,6 +1338,7 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         A::Downloads => app.show_downloads(),
         A::Serve => app.request_serve(),
         A::SendDevice => app.request_send_device(),
+        A::SyncDirs => app.request_sync(),
 
         // -------------------------------------------- the design compare -
         A::CompareDirs => app.compare_lists(),

@@ -209,6 +209,7 @@ impl App {
             Viewer::open_path(id, Arc::clone(&self.vfs), path.clone(), &self.config.viewer);
         let ascii = self.config.ui.ascii_borders;
         let (rows, cols) = self.quick_view_geometry;
+        let pictures = self.graphics != crate::term::graphics::Protocol::Off;
         let Some(quick) = self.quick.as_deref_mut() else {
             return;
         };
@@ -217,6 +218,18 @@ impl App {
         match opened {
             Ok(mut viewer) => {
                 viewer.set_ascii(ascii);
+                // The facts box stays closed in a panel, where the picture
+                // needs all the room; `i` opens it with the quick view focused.
+                viewer.set_picture_facts(false);
+                // A picture is shown as the picture, not as its bytes in hex.
+                // Only a picture: every other file keeps the quick view's
+                // plain reading, so this does not decide modes for the rest.
+                if pictures
+                    && viewer.names_picture()
+                    && let Err(err) = viewer.set_mode(crate::config::ViewerMode::Render)
+                {
+                    quick.error = Some(err.to_string());
+                }
                 if rows > 0
                     && cols > 0
                     && let Err(err) = viewer.layout(rows, cols)

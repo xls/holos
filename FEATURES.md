@@ -13,11 +13,12 @@ stated, not hidden.
 - Quick search by typing, incremental.
 - Marking by key, by `*.rs`-style mask, by inversion, or by comparing the two
   panels. `Shift` with a movement key sweeps a range.
-- Directory sizes on demand (`Space`), reported exactly.
+- Directory sizes on demand (`Space`), reported exactly. `Ctrl+Shift+L`
+  sizes every directory in the listing; sorted by size, the biggest come first.
 - Hidden-files toggle, brief and full views, and bookmarked directories
   (`Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`; `&` letters as in Total Commander; `F2`, `Del` and `Shift+Up/Down` edit it in place).
 - Quick view (`Ctrl+Q`): the opposite panel previews the file under the cursor,
-  following it as you move.
+  following it as you move. A picture is drawn as the picture.
 - Branch view (`Ctrl+B`): the whole tree below the current directory as one flat
   panel to search, mark and act on.
 - `Ctrl+E` brings the other panel here; `Ctrl+P` puts the path on the command
@@ -40,6 +41,12 @@ stated, not hidden.
 - Compare the two listings and mark differences by name, size and date
   (`Shift+F2`) or byte for byte (`Ctrl+Shift+F2`); copy the marks yourself with
   `F5`/`F6`.
+- Synchronize the two panels' directories (`Ctrl+Alt+S`), on any backend: both
+  panels list the two trees row for row, with what will happen to each file
+  beside the middle border. What differs starts marked; unmark to skip,
+  `Left`/`Right` to point a file the other way. `Alt+M` steps the mode (one
+  way, both ways, mirror) and the arrows follow; `Alt+C` also reads files whose
+  size and date match, to catch silent changes; `F5` runs it after asking.
 - Compare the two files under the cursors byte for byte, for a same-or-differs
   verdict.
 - Checksums: write and verify SHA-256 (`.sha256`) and CRC32 (`.sfv`), compatible

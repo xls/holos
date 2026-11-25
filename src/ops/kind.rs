@@ -110,6 +110,9 @@ pub enum JobKind {
     /// `Alt+X`: send the sources to a LocalSend device named in
     /// [`JobOptions::localsend`]. Reads the sources, writes nothing.
     LocalSend,
+    /// `Ctrl+Alt+S`: copy each source onto the target beside it, the files
+    /// the sync dialog chose. Paired, like [`Self::Rename`].
+    Sync,
 }
 
 impl JobKind {
@@ -132,6 +135,7 @@ impl JobKind {
             Self::Resize => "resize",
             Self::Download => "download",
             Self::LocalSend => "localsend",
+            Self::Sync => "sync",
         }
     }
 
@@ -154,6 +158,7 @@ impl JobKind {
             Self::Resize => "Resizing",
             Self::Download => "Downloading",
             Self::LocalSend => "Sending to device",
+            Self::Sync => "Synchronizing",
         }
     }
 
@@ -176,7 +181,10 @@ impl JobKind {
     /// The invariant that every other kind leaves `targets`
     /// empty is checked in this module's tests.
     pub const fn is_paired(&self) -> bool {
-        matches!(self, Self::Rename | Self::Compare | Self::CompareFiles)
+        matches!(
+            self,
+            Self::Rename | Self::Compare | Self::CompareFiles | Self::Sync
+        )
     }
 
     /// True for a job whose failures can be re-run as a fresh job over the

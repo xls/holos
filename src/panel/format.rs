@@ -188,14 +188,21 @@ fn size_bytes(entry: &Entry, sized: Option<u64>) -> Option<u64> {
 /// [`DateTime::from_timestamp`] rather than `SystemTime::into`, whose chrono
 /// impl ends in an `unwrap`.
 pub fn date_text(entry: &Entry, cfg: &PanelConfig) -> String {
-    let Some(mtime) = entry.mtime else {
+    time_text(entry.mtime, &cfg.date_format)
+}
+
+/// A time in `format`, the way [`date_text`] writes an entry's, for a caller
+/// that has a time and not an entry. Empty for no time, and for one outside
+/// what can be shown.
+pub fn time_text(mtime: Option<SystemTime>, format: &str) -> String {
+    let Some(mtime) = mtime else {
         return String::new();
     };
     let Some(local) = to_local(mtime) else {
         return String::new();
     };
     let mut out = String::new();
-    if local.format(&cfg.date_format).write_to(&mut out).is_ok() {
+    if local.format(format).write_to(&mut out).is_ok() {
         return out;
     }
     out.clear();

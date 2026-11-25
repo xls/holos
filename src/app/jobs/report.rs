@@ -85,6 +85,7 @@ pub fn report_for(view: View, summary: &JobSummary) -> Report {
         JobKind::CompareFiles => Report::CompareFiles,
         JobKind::Copy
         | JobKind::Move
+        | JobKind::Sync
         | JobKind::Delete { .. }
         | JobKind::Checksum { .. }
         | JobKind::Split
