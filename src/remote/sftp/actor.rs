@@ -140,6 +140,15 @@ pub(crate) enum Command {
         /// The answer.
         reply: Reply<()>,
     },
+    /// `SSH_FXP_SETSTAT` with the access and modification times only.
+    SetTimes {
+        /// The path.
+        path: String,
+        /// Seconds since the epoch, for both times.
+        secs: u32,
+        /// The answer.
+        reply: Reply<()>,
+    },
     /// Stop. Idempotent, because the actor also stops when its sender drops.
     Close,
 }
@@ -307,7 +316,8 @@ fn refuse(command: Command, context: &Context) {
         | Command::RemoveFile { reply, .. }
         | Command::RemoveDir { reply, .. }
         | Command::Rename { reply, .. }
-        | Command::SetPermissions { reply, .. } => {
+        | Command::SetPermissions { reply, .. }
+        | Command::SetTimes { reply, .. } => {
             let _ = reply.send(Err(context.lost()));
         }
         Command::Close => {}
@@ -380,6 +390,17 @@ async fn dispatch(session: Arc<RawSftpSession>, command: Command, ctx: Arc<Conte
         Command::SetPermissions { path, mode, reply } => {
             let mut wanted = FileAttributes::empty();
             wanted.permissions = Some(mode);
+            let out = session
+                .setstat(path.clone(), wanted)
+                .await
+                .map(|_| ())
+                .map_err(|e| attrs::map_error(&path, &ctx.authority, &e));
+            answer(reply, out, &ctx);
+        }
+        Command::SetTimes { path, secs, reply } => {
+            let mut wanted = FileAttributes::empty();
+            wanted.atime = Some(secs);
+            wanted.mtime = Some(secs);
             let out = session
                 .setstat(path.clone(), wanted)
                 .await

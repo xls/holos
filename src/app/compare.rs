@@ -144,6 +144,7 @@ impl App {
             return;
         };
         self.compare_names = Some((left_name, right_name));
+        self.compare_paths = Some((left.clone(), right.clone()));
         self.request_job(JobSpec::compare_files(left, right));
     }
 
@@ -175,13 +176,28 @@ impl App {
         });
     }
 
-    /// The path and name of the file under one panel's cursor.
+    /// The file one panel offers a comparison: its one marked file when
+    /// exactly one is marked, so two files with different names or in
+    /// different places can be compared by marking one on each side, and the
+    /// file under the cursor otherwise.
     ///
     /// `None` for an empty listing, for `..`, and for a directory - each of
     /// which is a reason this comparison has no operand rather than an error
     /// worth its own message, so the caller says which side was empty.
     fn cursor_file(&self, side: crate::app::Side) -> Option<(VfsPath, String)> {
         let tab = self.panel(side).active_tab();
+        let marked: Vec<usize> = tab
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| !e.is_parent && !e.is_dir() && tab.marks.contains(&e.name))
+            .map(|(i, _)| i)
+            .collect();
+        if let [only] = marked.as_slice()
+            && let Some(entry) = tab.entries.get(*only)
+        {
+            return Some((tab.path_of(*only)?, entry.name.clone()));
+        }
         let entry = tab.entries.get(tab.cursor)?;
         if entry.is_dir() || entry.name == ".." {
             return None;
@@ -196,6 +212,7 @@ impl App {
     /// them was asked for. That case reports the failure and claims nothing.
     pub fn finish_compare_files(&mut self, summary: &JobSummary) {
         let names = self.compare_names.take();
+        let paths = self.compare_paths.take();
         if summary.cancelled {
             self.message = Some("the comparison was cancelled".to_string());
             return;
@@ -211,11 +228,40 @@ impl App {
         let facts = names.map_or_else(Vec::new, |(left, right)| {
             vec![("Left".to_string(), left), ("Right".to_string(), right)]
         });
+        // Two files that differ are shown *how* they differ: the diff, as
+        // `Alt+Shift+F2` would. The byte verdict is kept for a file the diff
+        // cannot show, which is a binary one; the diff's opening says so and
+        // the verdict is put up instead.
+        if summary.first_difference.is_some()
+            && let Some((old, new)) = paths
+        {
+            self.diff_fallback = Some((facts, note));
+            self.request_view(crate::app::ViewRequest::Diff { old, new });
+            return;
+        }
         self.push_dialog(Box::new(FileInfoDialog::statement(
             "Compare files",
             facts,
             note,
         )));
+    }
+
+    /// A diff compare files asked for has opened, or could not be. When it
+    /// could not - a binary file, one too large to diff - the byte verdict is
+    /// shown with the reason, so the keystroke always answers on screen
+    /// rather than in a status line that is easy to miss.
+    pub fn diff_opened(&mut self, failed: Option<String>) {
+        let Some((facts, note)) = self.diff_fallback.take() else {
+            return;
+        };
+        if let Some(why) = failed {
+            self.message = None;
+            self.push_dialog(Box::new(FileInfoDialog::statement(
+                "Compare files",
+                facts,
+                format!("{note}\n\nNot shown as a diff: {why}"),
+            )));
+        }
     }
 
     /// The facing addresses of the names `ops.compare_contents` left undecided.

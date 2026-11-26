@@ -31,6 +31,7 @@ pub mod remote;
 pub mod rename;
 pub mod resize;
 pub mod restart;
+pub mod saved_sync;
 pub mod search;
 pub mod serve;
 pub mod settings;
@@ -836,6 +837,14 @@ pub struct App {
     pub localsend: crate::app::localsend::LocalSending,
     /// `Ctrl+Alt+S`: the scan behind the sync dialog.
     pub sync: crate::app::sync::Syncing,
+    /// The saved syncs, and whether `syncs.toml` is behind.
+    pub saved_syncs: crate::app::saved_sync::SavedSyncs,
+    /// The pair "Remember this sync?" is asking about.
+    pub sync_remember: Option<crate::app::saved_sync::SavedSync>,
+    /// A saved sync waiting for its panels to arrive.
+    pub sync_opening: Option<crate::app::saved_sync::Opening>,
+    /// The saved sync the rename prompt is naming.
+    pub sync_renaming: Option<usize>,
     /// The file this session is about to hand to something outside itself.
     ///
     pub handoff: crate::ops::open::Handoff,
@@ -865,6 +874,12 @@ pub struct App {
     ///
     /// [`JobSummary`]: crate::ops::JobSummary
     compare_names: Option<(String, String)>,
+    /// The two files compare files is reading, for the diff it opens when
+    /// they differ.
+    compare_paths: Option<(VfsPath, VfsPath)>,
+    /// What to show instead if that diff cannot be made because a file is
+    /// binary: the byte verdict, as `(facts, note)`.
+    pub(crate) diff_fallback: Option<(Vec<(String, String)>, String)>,
     /// A link the keystroke asked for, waiting for the event loop.
     pending_link: Option<crate::app::links::LinkRequest>,
     /// A permission change the keystroke asked for.
@@ -1027,11 +1042,17 @@ impl App {
             serving: crate::app::serve::Serving::default(),
             localsend: crate::app::localsend::LocalSending::default(),
             sync: crate::app::sync::Syncing::default(),
+            saved_syncs: crate::app::saved_sync::SavedSyncs::default(),
+            sync_remember: None,
+            sync_opening: None,
+            sync_renaming: None,
             handoff: crate::ops::open::Handoff::default(),
             pending_file_info: None,
             pending_clipboard: None,
             pending_resize: None,
             compare_names: None,
+            compare_paths: None,
+            diff_fallback: None,
             pending_link: None,
             pending_chmod: None,
             pending_git_status: None,

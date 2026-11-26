@@ -1698,7 +1698,21 @@ fn sync_copies_what_is_new_one_way_and_asks_first() {
     );
     s.send(keys::ENTER);
     s.wait("the copy", |_| t.dst().join("deep/new.txt").exists());
-    s.wait_for("the panels to come back", |t| !t.contains("One way"));
+    // The view stays and compares again once the copy is done: new.txt is now
+    // on both sides, and one way has nothing left to do.
+    s.wait_for("the trees compared again", |t| {
+        t.contains("One way") && t.contains("nothing to do")
+    });
+    // And offers to remember the pair; Esc is "Not now".
+    s.wait_for("the offer to remember it", |t| {
+        t.contains("Remember this sync?")
+    });
+    s.press(keys::ESC, "the offer to go", |t| {
+        !t.contains("Remember this sync?")
+    });
+    s.press(keys::ESC, "the panels to come back", |t| {
+        !t.contains("One way")
+    });
     assert_eq!(read(&t.dst().join("deep/new.txt")), b"only on the left");
     assert!(
         t.dst().join("backup-only.txt").exists(),

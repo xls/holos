@@ -578,14 +578,45 @@ mod tests {
         text.parse::<PublicKey>().expect("a fixture key parses")
     }
 
-    /// A `known_hosts` in its own directory, named after the test.
-    fn fixture(name: &str, contents: &str) -> PathBuf {
+    /// A directory that goes when the test is done with it.
+    struct Cleanup(PathBuf);
+
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// A `known_hosts` file in its own directory, named after the test, and
+    /// removed with it. It derefs to the file's path.
+    struct Fixture {
+        file: PathBuf,
+        _dir: Cleanup,
+    }
+
+    impl std::ops::Deref for Fixture {
+        type Target = Path;
+        fn deref(&self) -> &Path {
+            &self.file
+        }
+    }
+
+    impl AsRef<Path> for Fixture {
+        fn as_ref(&self) -> &Path {
+            &self.file
+        }
+    }
+
+    fn fixture(name: &str, contents: &str) -> Fixture {
         let dir = std::env::temp_dir().join(format!("hcmd-kh-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create the fixture directory");
         let file = dir.join("known_hosts");
         std::fs::write(&file, contents).expect("write the fixture");
-        file
+        Fixture {
+            file,
+            _dir: Cleanup(dir),
+        }
     }
 
     fn target(port: u16) -> Target {
@@ -908,6 +939,7 @@ mod tests {
     fn a_missing_file_is_an_unknown_host_and_not_an_error() {
         let dir = std::env::temp_dir().join(format!("hcmd-kh-{}-absent", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
+        let _cleanup = Cleanup(dir.clone());
         let file = dir.join("known_hosts");
         assert_eq!(
             verdict(&file, "nas.local", 22, &key(KEY_A)),
@@ -922,6 +954,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt as _;
         let dir = std::env::temp_dir().join(format!("hcmd-kh-{}-learn", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
+        let _cleanup = Cleanup(dir.clone());
         let file = dir.join(".ssh").join("known_hosts");
         learn(&file, "nas.local", 2222, &key(KEY_A)).expect("learn");
 

@@ -210,6 +210,7 @@ fn the_contents_check_finds_same_size_same_date_files_that_differ() {
         Direction::ToRight,
         true,
         &|| false,
+        &mut |_, _| {},
     )
     .unwrap();
     assert_eq!(unreadable, 0);

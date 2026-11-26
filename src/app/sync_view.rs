@@ -34,6 +34,17 @@ pub enum ScanState {
     },
     /// The rows are in.
     Done,
+    /// The run `F5` started is copying; the trees are compared again when it
+    /// finishes, so what is left to do - ideally nothing - is what is shown.
+    /// The text is the run's progress, refreshed from its job every turn.
+    Running(String),
+    /// The listings are in and the byte check is reading pairs.
+    Checking {
+        /// Pairs read so far.
+        done: usize,
+        /// Pairs to read.
+        total: usize,
+    },
     /// The scan could not finish, and why.
     Failed(String),
 }
@@ -75,6 +86,8 @@ pub struct SyncView {
     /// What has been typed for quick search.
     search: String,
     rescan: bool,
+    /// What the two sides are called on screen.
+    titles: Option<(String, String)>,
 }
 
 impl SyncView {
@@ -98,6 +111,7 @@ impl SyncView {
             view_rows: 0,
             search: String::new(),
             rescan: false,
+            titles: None,
         }
     }
 
@@ -279,6 +293,44 @@ impl SyncView {
         self.state = ScanState::Scanning { left: 0, right: 0 };
     }
 
+    /// The run has started, or moved on: its progress in words.
+    pub fn set_running(&mut self, progress: String) {
+        self.state = ScanState::Running(progress);
+    }
+
+    /// The byte check's progress.
+    pub fn set_checking(&mut self, done: usize, total: usize) {
+        self.state = ScanState::Checking { done, total };
+    }
+
+    /// What each side is called on screen: the panel's own name for it, an
+    /// `sftp://` address for a remote, rather than a bare path that reads
+    /// the same on two machines.
+    pub fn set_titles(&mut self, left: String, right: String) {
+        self.titles = Some((left, right));
+    }
+
+    /// The title for one side.
+    pub fn title(&self, left: bool) -> String {
+        match (&self.titles, left) {
+            (Some((l, _)), true) => l.clone(),
+            (Some((_, r)), false) => r.clone(),
+            (None, true) => self.left_root.to_string(),
+            (None, false) => self.right_root.to_string(),
+        }
+    }
+
+    /// Compare the trees again, keeping the mode and the options: after a
+    /// run, so the panels show what it did.
+    pub fn rescan(&mut self) {
+        self.rescan = true;
+        self.rows.clear();
+        self.marked.clear();
+        self.cursor = 0;
+        self.scroll = 0;
+        self.state = ScanState::Scanning { left: 0, right: 0 };
+    }
+
     /// `=`: show or hide identical files.
     pub fn toggle_same(&mut self) {
         let here = self.current_index();
@@ -359,13 +411,24 @@ impl SyncView {
 
     /// `Space`/`Ins`: take the row out of the run, or put it back. A row with
     /// nothing planned has nothing to put back; the arrows give it a plan.
-    pub fn toggle_mark(&mut self) {
+    pub fn toggle_mark(&mut self) -> &'static str {
         let Some(index) = self.current_index() else {
-            return;
+            return "";
         };
         let has_plan = self.rows.get(index).is_some_and(|r| r.plan != Plan::Skip);
-        if let Some(mark) = self.marked.get_mut(index) {
-            *mark = has_plan && !*mark;
+        let Some(mark) = self.marked.get_mut(index) else {
+            return "";
+        };
+        if !has_plan {
+            return "nothing to do for this file: Left or Right picks a direction";
+        }
+        *mark = !*mark;
+        // Said, because a file that differs starts marked: pressing Space to
+        // "select" it unmarks it, and that has to be visible.
+        if *mark {
+            "marked: it will be synchronized"
+        } else {
+            "unmarked: it will be left alone (Space marks it again)"
         }
     }
 
@@ -427,7 +490,7 @@ impl SyncView {
     pub fn summary(&self) -> String {
         let (right, left, deletes, bytes) = self.counts();
         if right + left + deletes == 0 {
-            return "nothing to do".to_string();
+            return self.nothing_planned();
         }
         let mut parts = Vec::new();
         if right > 0 {
@@ -452,6 +515,40 @@ impl SyncView {
             out.push_str(&format!("trash {deletes}"));
         }
         out
+    }
+
+    /// "Nothing to do", or, when files differ but none is planned, why and
+    /// what would plan them - so a difference on screen is never answered
+    /// with a bare "nothing to do".
+    fn nothing_planned(&self) -> String {
+        let mut newer_left = 0_usize;
+        let mut newer_right = 0_usize;
+        let mut other = 0_usize;
+        for (index, row) in self.rows.iter().enumerate() {
+            if self.effective(index) != Plan::Skip {
+                continue;
+            }
+            match row.status {
+                Status::LeftNewer => newer_left += 1,
+                Status::RightNewer => newer_right += 1,
+                Status::Differs | Status::Clash => other += 1,
+                Status::Same | Status::OnlyLeft | Status::OnlyRight => {}
+            }
+        }
+        let differ = newer_left + newer_right + other;
+        if differ == 0 {
+            return "nothing to do".to_string();
+        }
+        let why = match (newer_left, newer_right) {
+            (0, n) if n == differ => ", newer on the right".to_string(),
+            (n, 0) if n == differ => ", newer on the left".to_string(),
+            _ => String::new(),
+        };
+        // The keys that would plan them are on the right-hand status line.
+        format!(
+            "nothing marked; {differ} differ{}{why}",
+            if differ == 1 { "s" } else { "" }
+        )
     }
 
     /// The copies and deletes the marked rows plan.

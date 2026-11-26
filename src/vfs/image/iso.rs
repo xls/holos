@@ -1025,10 +1025,41 @@ mod tests {
         image
     }
 
-    fn write_image(tag: &str, bytes: &[u8]) -> std::path::PathBuf {
-        let path = temp(tag).join("image.iso");
+    /// A fixture file in its own directory, which goes when the test is
+    /// done with it. It derefs to the file's path.
+    struct Fixture {
+        dir: std::path::PathBuf,
+        path: std::path::PathBuf,
+    }
+
+    impl std::ops::Deref for Fixture {
+        type Target = std::path::Path;
+        fn deref(&self) -> &std::path::Path {
+            &self.path
+        }
+    }
+
+    impl AsRef<std::path::Path> for Fixture {
+        fn as_ref(&self) -> &std::path::Path {
+            &self.path
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn fixture_file(tag: &str, name: &str, bytes: &[u8]) -> Fixture {
+        let dir = temp(tag);
+        let path = dir.join(name);
         std::fs::write(&path, bytes).expect("write the fixture");
-        path
+        Fixture { dir, path }
+    }
+
+    fn write_image(tag: &str, bytes: &[u8]) -> Fixture {
+        fixture_file(tag, "image.iso", bytes)
     }
 
     fn index_of(path: &std::path::Path) -> Sink {
@@ -1161,7 +1192,7 @@ mod tests {
         use std::io::{Read as _, SeekFrom};
         let path = write_image("seek", &minimal_iso());
         let sink = index_of(&path);
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let mut handle = Iso9660
             .open_member(&region, &member_of(sink.get("HELLO.TXT")))
             .expect("no failure")
@@ -1175,7 +1206,7 @@ mod tests {
     #[test]
     fn the_volume_label_is_the_one_in_the_descriptor() {
         let path = write_image("label", &minimal_iso());
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         assert_eq!(Iso9660.volume_label(&region).as_deref(), Some("HANDBUILT"));
     }
 
@@ -1253,7 +1284,7 @@ mod tests {
     #[test]
     fn a_sink_that_says_stop_is_obeyed_promptly() {
         let path = write_image("stop", &minimal_iso());
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let mut sink = Sink {
             stop_after: Some(1),
             ..Sink::default()
@@ -1264,9 +1295,8 @@ mod tests {
 
     #[test]
     fn a_file_that_is_not_an_iso_fails_rather_than_listing_nothing() {
-        let path = temp("notiso").join("notes.img");
-        std::fs::write(&path, vec![b'q'; 100_000]).expect("write");
-        let region = Region::whole(&path).expect("open");
+        let path = fixture_file("notiso", "notes.img", &vec![b'q'; 100_000]);
+        let region = Region::whole(&*path).expect("open");
         let mut sink = Sink::default();
         let err = Iso9660
             .index(&region, &mut sink)
@@ -1284,7 +1314,7 @@ mod tests {
             data: u64::MAX - 8,
             len: 64,
         };
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let mut out = Vec::new();
         let err = Iso9660
             .read_member(&region, &member, &mut out)
@@ -1336,7 +1366,7 @@ mod tests {
     fn a_member_recorded_in_two_extents_is_not_offered_as_a_window() {
         let path = write_image("multiwindow", &multi_extent_iso());
         let sink = index_of(&path);
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let handle = Iso9660
             .open_member(&region, &member_of(sink.get("BIG.BIN")))
             .expect("no failure");
@@ -1392,7 +1422,7 @@ mod tests {
     fn a_directory_cannot_be_read_as_a_file() {
         let path = write_image("readdir", &minimal_iso());
         let sink = index_of(&path);
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let mut out = Vec::new();
         let err = Iso9660
             .read_member(&region, &member_of(sink.get("SUB")), &mut out)
@@ -1403,7 +1433,7 @@ mod tests {
     #[test]
     fn a_member_that_is_not_in_the_image_is_not_found() {
         let path = write_image("missing", &minimal_iso());
-        let region = Region::whole(&path).expect("open the image");
+        let region = Region::whole(&*path).expect("open the image");
         let member = Member {
             path: "NOPE.TXT".to_string(),
             kind: MemberKind::File,

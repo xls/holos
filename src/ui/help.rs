@@ -888,18 +888,39 @@ fn dialog_help(id: DialogId) -> (&'static str, &'static str) {
         DialogId::Sync => (
             "Synchronize",
             "Ctrl+Alt+S shows the two panels' directories side by side, compared\n\
-             all the way down, one row per file, and a column beside the middle\n\
+             all the way down, one row per file. A column beside the middle\n\
              border says what will happen: an arrow on the side that receives\n\
-             the file, x on the side it is trashed from, = the same on both,\n\
-             != different with no newer side. Files that\n\
-             differ start marked; Space or Ins unmarks one, Left and Right point\n\
-             it the other way. Alt+M (or Shift+F5) steps the mode - one way,\n\
-             both ways, mirror - and the arrows change with it; one way and\n\
-             mirror go from the panel with focus, so Tab turns them round. F5 runs what is shown, after this question. = shows\n\
-             identical files. Alt+C checks bytes: files that the size and date\n\
+             the file, x on the side it is trashed from, = the same on both, !=\n\
+             different with no newer side. Files that differ start marked; Space\n\
+             or Ins unmarks one, Left and Right point it the other way, and F3\n\
+             shows the row's two copies as a diff.\n\
+             Alt+M (or Shift+F5) steps the mode - one way, both ways, mirror -\n\
+             and the arrows change with it; one way and mirror go from the panel\n\
+             with focus, so Tab turns them round. F5 runs what is shown, after\n\
+             this question, and the trees are compared again when it is done.\n\
+             = shows identical files. Alt+C checks bytes: files the size and date\n\
              call the same are read on both sides and compared, which catches a\n\
-             file changed without its size or date changing; slower, so off\n\
-             until asked for. Esc leaves.",
+             file changed without either changing; slower, so off until asked\n\
+             for. Esc leaves.",
+        ),
+        DialogId::SyncRemember => (
+            "Remember this sync?",
+            "Asked once after a sync, for a pair that is not saved yet. Remember\n\
+             puts it in Ctrl+Alt+S's list, saved in syncs.toml. A remote side is\n\
+             kept as its address, never a password.",
+        ),
+        DialogId::SyncPicker => (
+            "Synchronize",
+            "Ctrl+Alt+S once a sync has been remembered: the first row compares\n\
+             the two panels as they are, the rest open a saved pair - each panel\n\
+             goes to its side, connecting where it has to, and the compare starts\n\
+             when both are there. Typing searches names and paths; F2 names the\n\
+             pair under the cursor and Del forgets it.",
+        ),
+        DialogId::SyncRename => (
+            "Rename sync",
+            "The name Ctrl+Alt+S's list shows for a saved sync. Left empty, the\n\
+             two folders' own names stand in.",
         ),
         DialogId::MultiRename => (
             "Multi-rename",

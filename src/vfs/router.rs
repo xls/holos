@@ -681,6 +681,10 @@ impl Vfs for VfsRouter {
         self.backend_for(path)?.read_link(path)
     }
 
+    fn set_mtime(&self, path: &VfsPath, mtime: std::time::SystemTime) -> Result<()> {
+        self.backend_for(path)?.set_mtime(path, mtime)
+    }
+
     /// A rename is refused across backends: the two sides address different
     /// namespaces, and "rename" would silently mean "copy and delete".
     fn rename(&self, from: &VfsPath, to: &VfsPath) -> Result<()> {

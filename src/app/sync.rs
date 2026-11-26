@@ -40,6 +40,13 @@ pub enum ScanEvent {
     },
     /// Why it could not finish.
     Failed(String),
+    /// The byte check: pairs read, of how many.
+    Checking {
+        /// Read so far.
+        done: usize,
+        /// To read.
+        total: usize,
+    },
 }
 
 /// One scan to run.
@@ -71,6 +78,14 @@ impl Drop for Running {
 pub struct Syncing {
     /// The view in both panels, while it is up.
     pub view: Option<SyncView>,
+    /// The jobs a run queued, while they are going.
+    awaiting: Vec<crate::ops::JobId>,
+    /// The files and bytes the run planned, shown until its jobs have counted
+    /// their own.
+    planned: (u64, u64),
+    /// The compare running now is the one after a run: when it is done, offer
+    /// to remember the pair.
+    after_run: bool,
     pending: Option<Request>,
     running: Option<Running>,
 }
@@ -86,6 +101,8 @@ fn scan(
     let cancelled = || cancel.load(Ordering::Relaxed);
     let mut last = Instant::now();
     let mut counts = (0_u64, 0_u64);
+    // Throttled, so a big tree does not flood the channel - but the last count
+    // of each side is always sent, below, or a quick listing would show 0.
     let report = |counts: (u64, u64), last: &mut Instant| {
         if last.elapsed() >= TICK {
             *last = Instant::now();
@@ -99,6 +116,10 @@ fn scan(
         counts.0 = n;
         report(counts, &mut last);
     });
+    let _ = tx.send(ScanEvent::Progress {
+        left: counts.0,
+        right: counts.1,
+    });
     let left = match left {
         Ok(listing) => listing,
         Err(err) => {
@@ -109,6 +130,10 @@ fn scan(
     let right = sync::list_tree(vfs, &request.right, &cancelled, &mut |n| {
         counts.1 = n;
         report(counts, &mut last);
+    });
+    let _ = tx.send(ScanEvent::Progress {
+        left: counts.0,
+        right: counts.1,
     });
     let right = match right {
         Ok(listing) => listing,
@@ -137,6 +162,9 @@ fn scan(
             request.direction,
             request.mirror,
             &cancelled,
+            &mut |done, total| {
+                let _ = tx.send(ScanEvent::Checking { done, total });
+            },
         );
         if checked.is_err() {
             return;
@@ -179,7 +207,13 @@ impl App {
         // drawn instead of half of it.
         self.quick = None;
         let direction = self.one_way();
-        self.sync.view = Some(SyncView::new(left.clone(), right.clone(), direction));
+        let mut view = SyncView::new(left.clone(), right.clone(), direction);
+        view.set_titles(
+            self.location_of(&left).unwrap_or_else(|| left.to_string()),
+            self.location_of(&right)
+                .unwrap_or_else(|| right.to_string()),
+        );
+        self.sync.view = Some(view);
         self.sync.running = None;
         self.sync.pending = Some(Request {
             left,
@@ -218,8 +252,35 @@ impl App {
     /// it when the view has gone. Called by the event loop every turn.
     pub fn service_sync(&mut self) {
         let slack = self.config.ops.compare_mtime_slack.duration();
-        let Some(view) = self.sync.view.as_mut() else {
+        if self.sync.view.is_none() {
             self.sync = Syncing::default();
+            return;
+        }
+        // A run in progress: its jobs' progress, in words, every turn - the
+        // view says how far the copy has got, whether its dialog is up or
+        // was sent to the background.
+        if !self.sync.awaiting.is_empty() {
+            let progress = self.run_progress();
+            if let Some(view) = self.sync.view.as_mut() {
+                view.set_running(progress);
+            }
+        }
+        // A run whose jobs have all finished: compare again, so the panels
+        // show what is left to do rather than what was.
+        if !self.sync.awaiting.is_empty()
+            && self
+                .sync
+                .awaiting
+                .iter()
+                .all(|id| self.job(*id).is_none_or(crate::ops::JobStatus::is_finished))
+        {
+            self.sync.awaiting.clear();
+            self.sync.after_run = true;
+            if let Some(view) = self.sync.view.as_mut() {
+                view.rescan();
+            }
+        }
+        let Some(view) = self.sync.view.as_mut() else {
             return;
         };
         if view.take_rescan() {
@@ -232,10 +293,11 @@ impl App {
                 contents: view.contents(),
             });
         }
-        if let Some(request) = self.sync.pending.take() {
-            let Ok(handle) = tokio::runtime::Handle::try_current() else {
-                return;
-            };
+        // Taken only once there is somewhere to run it, so a scan asked for
+        // before the runtime is reachable is still owed rather than lost.
+        if let Ok(handle) = tokio::runtime::Handle::try_current()
+            && let Some(request) = self.sync.pending.take()
+        {
             let (tx, rx) = mpsc::channel();
             let cancel = Arc::new(AtomicBool::new(false));
             let flag = Arc::clone(&cancel);
@@ -259,13 +321,19 @@ impl App {
         }
         if finished {
             self.sync.running = None;
+            if std::mem::take(&mut self.sync.after_run) {
+                self.offer_to_remember();
+            }
         }
     }
 
     /// When [`App::service_sync`] next wants to run: soon, while a scan is
     /// going, so its counts move.
     pub fn sync_deadline(&self) -> Option<Instant> {
-        (self.sync.running.is_some() || self.sync.pending.is_some()).then(|| Instant::now() + TICK)
+        (self.sync.running.is_some()
+            || self.sync.pending.is_some()
+            || !self.sync.awaiting.is_empty())
+        .then(|| Instant::now() + TICK)
     }
 
     /// `F5`: ask, with the counts, before running what the panels show.
@@ -306,11 +374,14 @@ impl App {
         let Some(view) = self.sync.view.as_ref() else {
             return;
         };
-        let summary = view.summary();
-        if summary == "nothing to do" {
-            self.message = Some("nothing is marked to synchronize".to_string());
+        // Counted, never read off the summary's wording: the summary is for
+        // people, and its words change.
+        if to_right + to_left + deletes == 0 {
+            self.message =
+                Some("nothing is marked to synchronize: Space or Ins marks a row".to_string());
             return;
         }
+        let summary = view.summary();
         let mut words: Vec<char> = summary.chars().collect();
         if let Some(first) = words.first_mut() {
             *first = first.to_ascii_uppercase();
@@ -328,28 +399,44 @@ impl App {
     }
 
     /// The question answered yes: queue the copies as one job and the
-    /// deletes as another, to the trash, and leave the view.
+    /// deletes as another, to the trash. The view stays, says it is
+    /// synchronizing, and compares the trees again when the jobs are done.
     pub fn run_sync(&mut self) {
         let Some(view) = self.sync.view.as_ref() else {
             return;
         };
         let answer = view.answer();
-        self.leave_sync();
+        // A run with nothing in it would wait for jobs that were never queued.
+        if answer.copies.is_empty() && answer.deletes.is_empty() {
+            self.message = Some("nothing is marked to synchronize".to_string());
+            return;
+        }
+        let (_, _, _, planned_bytes) = view.counts();
+        self.sync.planned = (
+            u64::try_from(answer.copies.len() + answer.deletes.len()).unwrap_or(u64::MAX),
+            planned_bytes,
+        );
         let copies = answer.copies.len();
         let deletes = answer.deletes.len();
+        let mut awaiting = Vec::new();
         if copies > 0 {
             let spec = JobSpec::sync(answer.copies).with_options(crate::ops::JobOptions {
                 conflict: Some(crate::ops::ConflictChoice::Overwrite),
                 ..crate::ops::JobOptions::from_config(&self.config.ops)
             });
-            self.request_job(spec);
+            awaiting.push(self.request_job(spec));
         }
         if deletes > 0 {
-            self.request_job(JobSpec::new(
+            awaiting.push(self.request_job(JobSpec::new(
                 JobKind::Delete { trash: true },
                 answer.deletes,
                 None,
-            ));
+            )));
+        }
+        self.sync.awaiting = awaiting;
+        let progress = self.run_progress();
+        if let Some(view) = self.sync.view.as_mut() {
+            view.set_running(progress);
         }
         self.message = Some(match (copies, deletes) {
             (0, 0) => "nothing to synchronize".to_string(),
@@ -366,11 +453,47 @@ impl App {
     }
 }
 
+impl App {
+    /// How far a run has got: `copying 3 of 12 files, 41 M of 122 M:
+    /// report.pdf`, from the jobs it queued.
+    fn run_progress(&self) -> String {
+        let mut files = (0_u64, 0_u64);
+        let mut bytes = (0_u64, 0_u64);
+        let mut current = String::new();
+        for id in &self.sync.awaiting {
+            let Some(job) = self.job(*id) else {
+                continue;
+            };
+            files.0 = files.0.saturating_add(job.files_done);
+            files.1 = files.1.saturating_add(job.files_total);
+            bytes.0 = bytes.0.saturating_add(job.bytes_done);
+            bytes.1 = bytes.1.saturating_add(job.bytes_total);
+            if job.is_running() && !job.file.is_empty() {
+                current = job.file.rsplit('/').next().unwrap_or(&job.file).to_string();
+            }
+        }
+        // A job that has not started has counted nothing yet; the plan is the
+        // honest total until it has.
+        files.1 = files.1.max(self.sync.planned.0);
+        bytes.1 = bytes.1.max(self.sync.planned.1);
+        let size = crate::panel::format::human_size;
+        let mut line = format!("synchronizing {} of {} files", files.0, files.1);
+        if bytes.1 > 0 {
+            line.push_str(&format!(", {} of {}", size(bytes.0), size(bytes.1)));
+        }
+        if !current.is_empty() {
+            line.push_str(&format!(": {current}"));
+        }
+        line
+    }
+}
+
 fn apply(view: &mut SyncView, event: ScanEvent) {
     match event {
         ScanEvent::Progress { left, right } => view.set_progress(left, right),
         ScanEvent::Done { rows, unreadable } => view.set_rows(rows, unreadable),
         ScanEvent::Failed(why) => view.set_failed(why),
+        ScanEvent::Checking { done, total } => view.set_checking(done, total),
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name         = "holoscommander"
-version      = "0.17.10"
+version      = "0.17.11"
 edition      = "2024"
 rust-version = "1.95"
 description  = "A Total Commander alternative for the terminal, for fingers that learned F5 in 1998"
@@ -209,7 +209,7 @@ partitions                = { package = "rust-disk-partitions", version = "=0.7.
 smb2 = "0.20.1"
 ext4-view = "0.9.3"
 squashfs_reader = "0.1.1"
-gix                       = { version = "0.87", default-features = false, features = ["basic", "sha1"] }
+gix                       = { version = "0.91", default-features = false, features = ["basic", "sha1"] }
 sha2                      = { version = "0.11", default-features = false }
 crc32fast                 = { version = "1", default-features = false, features = ["std"] }
 hmac                      = { version = "0.13", default-features = false }

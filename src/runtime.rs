@@ -114,6 +114,8 @@ pub enum ConfigWritten {
     Hosts(Option<String>),
     /// `hotlist.toml`.
     Hotlist(Option<String>),
+    /// `syncs.toml`.
+    Syncs(Option<String>),
 }
 
 /// Which configuration files have a write in flight.
@@ -128,6 +130,8 @@ pub struct ConfigWrites {
     hosts: bool,
     /// `hotlist.toml`.
     hotlist: bool,
+    /// `syncs.toml`.
+    syncs: bool,
 }
 
 /// Queue whatever the host book and the hotlist still owe their files.
@@ -163,6 +167,18 @@ pub fn service_config_writes(
                 .err()
                 .map(|err| err.to_string());
             let _ = tx.blocking_send(ConfigWritten::Hotlist(problem));
+        });
+    }
+    if !writing.syncs
+        && let Some(list) = app.take_saved_syncs_write()
+    {
+        writing.syncs = true;
+        let tx = tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let problem = crate::app::saved_sync::store(&list)
+                .err()
+                .map(|err| err.to_string());
+            let _ = tx.blocking_send(ConfigWritten::Syncs(problem));
         });
     }
 }
@@ -271,6 +287,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
     // the hotlist, read once here for the same reason: `Ctrl+D`
     // builds its popup from what is already in memory.
     app.load_hotlist();
+    app.load_saved_syncs();
 
     if !app.warnings.is_empty() {
         app.message = Some(format!(
@@ -471,6 +488,7 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
         app.service_exe_watch(std::time::Instant::now());
         app.service_localsend();
         app.service_sync();
+        app.service_saved_open();
         app.service_file_info(&info_tx);
         app.service_links(&link_tx);
         service_git_status(&mut app, &git_tx);
@@ -933,6 +951,10 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
                         writing.hotlist = false;
                         problem
                     }
+                    ConfigWritten::Syncs(problem) => {
+                        writing.syncs = false;
+                        problem
+                    }
                 };
                 if let Some(problem) = problem {
                     app.message = Some(problem);
@@ -1014,7 +1036,16 @@ pub async fn event_loop() -> Result<Option<std::path::PathBuf>> {
             }
             Some(opened) = view_rx.recv() => {
                 opening_viewer = false;
+                // A diff compare files asked for: on a binary file its byte
+                // verdict replaces the refusal.
+                let failed = opened.as_ref().err().map(|err| match err {
+                    crate::error::Error::Unsupported(BINARY_DIFF) => {
+                        "a binary file".to_string()
+                    }
+                    other => other.to_string(),
+                });
                 push_opened_viewer(&mut app, opened, &index_tx);
+                app.diff_opened(failed);
                 // The keys held while the open ran are applied here, and
                 // `App::push_viewer` has just laid the viewer out at the size
                 // the last frame measured - without that a `PgDn` waiting
@@ -1543,6 +1574,14 @@ fn git_history_side(
 const DIFF_SIDE_MAX: u64 = 32 * 1024 * 1024;
 
 /// One side of a diff, read whole and decoded, or a refusal that says why.
+/// How much of a file is looked at to call it binary.
+const BINARY_SNIFF: usize = 8192;
+
+/// The refusal a binary side gets, which is how the event loop knows to show
+/// compare files' byte verdict instead.
+const BINARY_DIFF: &str =
+    "a binary file cannot be shown as a diff; Ctrl+Alt+C says where they differ";
+
 fn read_side(vfs: &dyn crate::vfs::Vfs, path: &crate::vfs::VfsPath) -> crate::Result<String> {
     use std::io::Read as _;
     let reader = vfs.open_read(path)?;
@@ -1557,6 +1596,11 @@ fn read_side(vfs: &dyn crate::vfs::Vfs, path: &crate::vfs::VfsPath) -> crate::Re
             path.display_title(),
             DIFF_SIDE_MAX / (1024 * 1024)
         )));
+    }
+    // A NUL in the head is what every diff tool takes for binary: lines of a
+    // binary file are noise, and the byte compare is the answer for it.
+    if bytes.iter().take(BINARY_SNIFF).any(|b| *b == 0) {
+        return Err(crate::error::Error::Unsupported(BINARY_DIFF));
     }
     Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
@@ -1784,8 +1828,12 @@ pub fn open_pending_viewer(
             let built = tokio::task::spawn_blocking(move || {
                 let label = old.display_title();
                 let text = read_side(vfs.as_ref(), &old)?;
+                // The new side is read once here too, only to be refused if it
+                // is binary; the viewer then reads it as it reads any file.
+                read_side(vfs.as_ref(), &new)?;
                 let mut viewer = Viewer::open_path(id, vfs, new, &cfg)?;
                 viewer.set_diff_side(viewer::DiffSide { label, text });
+                viewer.show_diff_first();
                 // Straight to mode 3: the diff is the whole reason this viewer
                 // was opened, and landing in the text of one of its two sides
                 // would answer a question nobody asked.

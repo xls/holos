@@ -63,6 +63,7 @@ pub mod renameresult;
 pub mod resize;
 pub mod serve;
 pub mod summary;
+pub mod syncpick;
 pub mod tabbed;
 pub mod template;
 pub mod theme;

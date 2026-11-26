@@ -151,3 +151,22 @@ fn the_mode_steps_one_way_both_ways_mirror_and_replans_each_time() {
     assert_eq!(v.mode(), Mode::OneWay);
     assert_eq!(v.effective(1), Plan::Skip);
 }
+
+#[test]
+fn nothing_planned_says_which_side_is_newer() {
+    let mut v = SyncView::new(
+        VfsPath::local("/a"),
+        VfsPath::local("/b"),
+        Direction::ToRight,
+    );
+    v.set_rows(
+        vec![row("photo.jpg", facts(30), facts(40), Status::RightNewer)],
+        Vec::new(),
+    );
+    assert_eq!(v.summary(), "nothing marked; 1 differs, newer on the right");
+    v.set_rows(
+        vec![row("same.txt", facts(5), facts(5), Status::Same)],
+        Vec::new(),
+    );
+    assert_eq!(v.summary(), "nothing to do");
+}

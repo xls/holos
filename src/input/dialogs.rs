@@ -570,6 +570,11 @@ pub fn dialog_answered(app: &mut App, id: DialogId, job: Option<JobId>, result: 
         // The sync view's question: yes runs the marked rows, no leaves the
         // view as it was to be changed further.
         (DialogId::Sync, DialogResult::Confirm(true)) => app.run_sync(),
+        (DialogId::SyncRemember, DialogResult::Confirm(yes)) => app.answer_remember(*yes),
+        (DialogId::SyncPicker, DialogResult::Text(text)) => {
+            app.answer_sync_pick(crate::ui::dialog::syncpick::read_answer(text));
+        }
+        (DialogId::SyncRename, DialogResult::Text(name)) => app.answer_sync_rename(name),
         // The popup's own edits. A move hands back the whole list; the two
         // prompts it pushes act on the entry under its cursor, which cannot
         // have moved while they were up.

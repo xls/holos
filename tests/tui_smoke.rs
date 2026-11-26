@@ -197,6 +197,11 @@ fn run_in_pty(run: Run<'_>) -> (vt100::Parser, bool) {
     // and could paint a notice over a status bar an assertion reads.
     cmd.env("HCMD_NO_UPDATE_CHECK", "1");
     cmd.env("HCMD_NO_FS_WATCH", "1");
+    // F4 runs an editor. The developer's own would read their config and write
+    // its state into the throwaway directory after hcmd had gone; `true` exits
+    // at once, which is all a test of what happens before it needs.
+    cmd.env("EDITOR", "true");
+    cmd.env("VISUAL", "true");
     // Keep the test off the developer's real configuration, and off its saved
     // tab state - a restored tab would change what the panel is showing.
     let dir = std::env::temp_dir().join(format!(
@@ -262,8 +267,13 @@ fn run_in_pty(run: Run<'_>) -> (vt100::Parser, bool) {
     }
     if !exited {
         let _ = child.kill();
+        // Reaped before the directory goes: a child still on its way out
+        // writes its saved state there and puts the directory back.
+        let _ = child.wait();
     }
     drop(writer);
+    // The throwaway config and state directory, which every run used to leave
+    // in the temp directory.
     let _ = std::fs::remove_dir_all(&dir);
     (parser, exited)
 }
@@ -1567,6 +1577,10 @@ impl ComparePair {
         std::fs::write(root.join("a.txt"), b"identical contents").expect("a");
         std::fs::write(root.join("b.txt"), b"identical contents").expect("b");
         std::fs::write(root.join("c.txt"), b"identical contentX").expect("c");
+        // Two binary files, which a diff cannot show: d.bin and e.bin differ
+        // at byte 5.
+        std::fs::write(root.join("d.bin"), b"\x00\x01\x02\x03\x04AAAA").expect("d");
+        std::fs::write(root.join("e.bin"), b"\x00\x01\x02\x03\x04BBBB").expect("e");
         Self { root }
     }
 }
@@ -1602,7 +1616,7 @@ fn compare_files_says_two_files_with_the_same_bytes_are_identical() {
 }
 
 #[test]
-fn compare_files_says_where_two_files_stop_agreeing() {
+fn compare_files_shows_two_text_files_that_differ_as_a_diff() {
     let fixture = ComparePair::new("differ");
     let mut run = Run::new(100, 30);
     run.cwd = Some(fixture.root.clone());
@@ -1612,14 +1626,36 @@ fn compare_files_says_where_two_files_stop_agreeing() {
     run.input = &input;
     let (parser, _) = run_in_pty(run);
     let text = plain(&parser);
-    // The last byte of eighteen, so the offset is 17 and not the length.
     assert!(
-        text.contains("The two files differ, from byte 17."),
-        "comparing two files that differ did not say where:\n{text}"
+        text.contains("identical contents") && text.contains("identical contentX"),
+        "both versions of the line, as a diff shows them:\n{text}"
     );
     assert!(
-        text.contains("Compare files") && text.contains("a.txt") && text.contains("c.txt"),
-        "the verdict does not say which two files it is about:\n{text}"
+        !text.contains("from byte"),
+        "a text file gets the diff, not the byte verdict:\n{text}"
+    );
+}
+
+#[test]
+fn compare_files_says_where_two_binary_files_stop_agreeing() {
+    let fixture = ComparePair::new("binary");
+    let mut run = Run::new(100, 30);
+    run.cwd = Some(fixture.root.clone());
+    // The listing sorts by name: a.txt, b.txt, c.txt, d.bin, e.bin. Left onto
+    // d.bin, then across and onto e.bin.
+    let input = keys(&[
+        DOWN, DOWN, DOWN, DOWN, TAB, DOWN, DOWN, DOWN, DOWN, DOWN, CTRL_ALT_C,
+    ]);
+    run.input = &input;
+    let (parser, _) = run_in_pty(run);
+    let text = plain(&parser);
+    assert!(
+        text.contains("The two files differ, from byte 5."),
+        "a binary pair has no diff, so the byte verdict says where:\n{text}"
+    );
+    assert!(
+        text.contains("d.bin") && text.contains("e.bin"),
+        "the verdict says which two files it is about:\n{text}"
     );
 }
 
@@ -2347,5 +2383,28 @@ fn alt_v_browses_the_git_history() {
     assert!(
         text.contains("one"),
         "the commit subject is not listed:\n{text}"
+    );
+}
+
+/// A diff asked for by name opens on the diff even for a file that has a
+/// document of its own: two Markdown files compared showed the right one
+/// rendered as a page, which is not the answer to "how do they differ".
+#[test]
+fn compare_files_on_markdown_shows_the_diff_not_the_page() {
+    let root = std::env::temp_dir().join(format!("hcmd-cmp-md-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).expect("fixture dir");
+    std::fs::write(root.join("a.md"), "# Notes\n\nfirst line\n").expect("a");
+    std::fs::write(root.join("b.md"), "# Notes\n\nfirst line changed\n").expect("b");
+    let mut run = Run::new(100, 24);
+    run.cwd = Some(root.clone());
+    let input = keys(&[DOWN, TAB, DOWN, DOWN, CTRL_ALT_C]);
+    run.input = &input;
+    let (parser, _) = run_in_pty(run);
+    let text = plain(&parser);
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(
+        text.contains("--- a.md") && text.contains("+first line changed"),
+        "the diff, with its markers:\n{text}"
     );
 }

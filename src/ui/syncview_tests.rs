@@ -108,3 +108,68 @@ fn it_draws_while_comparing_and_in_ascii_at_every_size() {
         }
     }
 }
+
+#[test]
+fn a_remote_side_is_titled_with_its_address_not_a_bare_path() {
+    let mut app = app(false);
+    if let Some(v) = app.sync_view_mut() {
+        v.set_titles(
+            "/home/thomas/TestData".to_string(),
+            "sftp://thomas@nas.local:22/home/thomas/TestData".to_string(),
+        );
+    }
+    let lines = screen(&mut app, 120, 20);
+    assert!(lines[0].contains("sftp://thomas@nas"), "{}", lines[0]);
+}
+
+#[test]
+fn the_byte_check_and_a_run_say_how_far_they_have_got() {
+    let mut app = app(false);
+    if let Some(v) = app.sync_view_mut() {
+        v.set_checking(3, 40);
+    }
+    assert!(
+        screen(&mut app, 100, 20)
+            .join("\n")
+            .contains("checking bytes: 3 of 40")
+    );
+    if let Some(v) = app.sync_view_mut() {
+        v.set_running("synchronizing 2 of 5 files, 41.0M of 122.0M: big.iso".to_string());
+    }
+    assert!(
+        screen(&mut app, 100, 20)
+            .join("\n")
+            .contains("2 of 5 files")
+    );
+}
+
+#[test]
+fn a_difference_left_unplanned_is_shown_and_explained() {
+    let mut app = app(false);
+    // photo.jpg is newer on the right, so one way leaves it; zeta.md is
+    // unmarked by hand. Neither is a "nothing to do" while it is different.
+    if let Some(v) = app.sync_view_mut() {
+        v.move_to(0);
+        v.toggle_mark();
+        v.move_to(3);
+        v.toggle_mark();
+    }
+    let all = screen(&mut app, 120, 20).join("\n");
+    // zeta.md, unmarked, is the other: newer on the left.
+    assert!(all.contains("nothing marked; 2 differ "), "{all}");
+    let photo = all.lines().find(|l| l.contains("photo.jpg")).unwrap();
+    assert!(photo.contains('\u{2260}'), "{photo}");
+}
+
+#[test]
+fn the_view_says_it_is_sync_mode_and_how_to_leave_top_left() {
+    let mut app = app(false);
+    let lines = screen(&mut app, 100, 20);
+    let top = &lines[0];
+    assert!(top.starts_with("\u{250c} Sync mode - Esc to exit"), "{top}");
+    assert_eq!(
+        top.matches("Sync mode").count(),
+        1,
+        "once, on the left: {top}"
+    );
+}

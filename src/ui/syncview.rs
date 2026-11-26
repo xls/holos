@@ -32,6 +32,9 @@ use crate::ops::sync::{Facts, Plan, Status};
 use crate::panel::Side;
 use crate::panel::format::{human_size, time_text};
 
+/// What the left panel's top border starts with while the view is up.
+pub const BADGE: &str = " Sync mode - Esc to exit ";
+
 /// The widest a date is drawn.
 const DATE_MAX: usize = 16;
 
@@ -56,7 +59,10 @@ pub fn sign(view: &SyncView, index: usize, side: Side, ascii: bool) -> char {
             Status::Same => '=',
             Status::Differs => pick('\u{2260}', '!'),
             Status::Clash => '!',
-            Status::LeftNewer | Status::OnlyLeft | Status::RightNewer | Status::OnlyRight => ' ',
+            // Different, and left alone: one way does not overwrite a newer
+            // target. Said, so a difference is never a blank row.
+            Status::LeftNewer | Status::RightNewer => pick('\u{2260}', '!'),
+            Status::OnlyLeft | Status::OnlyRight => ' ',
         },
     }
 }
@@ -77,29 +83,42 @@ pub fn draw_panel(f: &mut Frame, app: &App, side: Side, area: Rect) {
     } else {
         theme.panel.inactive_border
     };
-    let (left_root, right_root) = view.roots();
-    let root = match side {
-        Side::Left => left_root,
-        Side::Right => right_root,
-    };
     let inner = usize::from(area.width).saturating_sub(2);
+    // Top left of the screen, in the cursor's colours so it cannot be missed:
+    // the panels are not showing directories, and Esc is the way back.
+    let badge = if side == Side::Left { BADGE } else { "" };
+    let mode = format!(" {} ", view.mode_label(app.config.ui.ascii_borders));
     let title = text::fit_left(
-        &root.to_string(),
-        inner.saturating_sub(10),
+        &view.title(side == Side::Left),
+        inner
+            .saturating_sub(text::width(&mode) + 4)
+            .saturating_sub(text::width(badge)),
         Crop::Middle,
         g.ellipsis(),
     );
+    let mut heading = Vec::new();
+    if !badge.is_empty() {
+        let (bg, fg) = CursorStyle::Focused.colors(theme);
+        heading.push(Span::styled(
+            badge,
+            Style::new()
+                .fg(color(fg))
+                .bg(color(bg))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+    heading.push(Span::styled(
+        format!(" {title} "),
+        Style::new().fg(color(theme.panel.header_fg)),
+    ));
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(g.border_set())
         .border_style(Style::new().fg(color(border)))
-        .title_top(Line::from(Span::styled(
-            format!(" {title} "),
-            Style::new().fg(color(theme.panel.header_fg)),
-        )))
+        .title_top(Line::from(heading))
         .title_top(
             Line::from(Span::styled(
-                format!(" {} ", view.mode_label(app.config.ui.ascii_borders)),
+                mode,
                 Style::new().fg(color(theme.panel.header_fg)),
             ))
             .right_aligned(),
@@ -140,6 +159,13 @@ pub fn draw_panel(f: &mut Frame, app: &App, side: Side, area: Rect) {
             centred(f, r.entries, &format!("comparing... {count} files"), body);
         }
         ScanState::Failed(why) => centred(f, r.entries, why, body),
+        ScanState::Running(progress) => centred(f, r.entries, progress, body),
+        ScanState::Checking { done, total } => centred(
+            f,
+            r.entries,
+            &format!("checking bytes: {done} of {total} files"),
+            body,
+        ),
         ScanState::Done => draw_rows(f, app, view, side, r.entries, date_w),
     }
 
@@ -275,6 +301,10 @@ fn status_text(view: &SyncView, side: Side, ascii: bool) -> String {
                 ScanState::Done => view.summary(),
                 ScanState::Scanning { .. } => "comparing...".to_string(),
                 ScanState::Failed(_) => "could not compare".to_string(),
+                ScanState::Running(progress) => progress.clone(),
+                ScanState::Checking { done, total } => {
+                    format!("checking bytes: {done} of {total}")
+                }
             };
             if view.contents() {
                 line.push_str("  [bytes checked]");

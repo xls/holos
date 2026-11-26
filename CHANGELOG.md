@@ -2,6 +2,17 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.11
+
+- Uploads to a remote go through a temporary name and replace the file only when complete: a failed upload (a full disk, a dropped connection) keeps the previous copy instead of leaving a cut-off file.
+- A file copied to SFTP keeps its date, so the next comparison sees the two as the same.
+- Sync shows live progress while copying and while checking bytes, titles a remote side with its address, compares again when a run finishes, and offers to remember the pair; `Ctrl+Alt+S` then lists saved syncs, remote ones included, with names (`F2`), search and `Del`.
+- Sync: `F3` diffs a row; a difference left unplanned shows `≠` and is explained; `Space` says whether it marked or unmarked; `F5` with nothing marked says so instead of running an empty sync; a "Sync mode - Esc to exit" badge.
+- `Ctrl+Alt+C` shows two text files that differ as a diff, and the byte verdict (with the reason) for binary or very large ones; a diff asked for always opens on the diff, even for Markdown or JSON.
+- Compare and diff take the one marked file on each side, else the cursors.
+- Tests no longer leave folders in the temp directory, or start your own editor.
+- gix 0.91, which drops the last open advisory (heapless 0.8).
+
 ## v0.17.10
 
 - `Ctrl+Alt+S` synchronizes the two panels' directories, on any backend: both panels list the two trees row for row, what differs starts marked, and a column beside the middle border shows what will be copied or trashed. `Alt+M` steps one way, both ways and mirror, `Tab` turns the direction round, `Alt+C` also checks bytes, and `F5` runs it after asking.

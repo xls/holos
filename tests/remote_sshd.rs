@@ -503,6 +503,35 @@ async fn a_panel_reads_a_real_server_through_the_vfs_trait() {
         .await;
     }
 
+    // A copy job onto that same file: the upload goes through a temporary
+    // name and is renamed over the old copy - which a version-3 server only
+    // allows once the old one is removed - and nothing is left beside it.
+    {
+        let router = Arc::clone(&router);
+        let here = here.clone();
+        let local = scratch("sshd-copy-src");
+        std::fs::write(local.join("through-the-trait.txt"), b"the newer copy").expect("src");
+        blocking(move || {
+            let spec = holoscommander::ops::JobSpec::new(
+                holoscommander::ops::JobKind::Copy,
+                vec![holoscommander::vfs::VfsPath::local(
+                    local.join("through-the-trait.txt"),
+                )],
+                Some(here),
+            )
+            .with_options(holoscommander::ops::JobOptions {
+                conflict: Some(holoscommander::ops::ConflictChoice::Overwrite),
+                ..holoscommander::ops::JobOptions::default()
+            });
+            let (mut ctx, _rx, _decisions, _cancel) =
+                holoscommander::ops::JobContext::for_test(spec.kind);
+            holoscommander::ops::run(router.as_ref(), &spec, &mut ctx);
+            let summary = ctx.finish();
+            assert!(summary.failures.is_empty(), "{:?}", summary.failures);
+            let _ = std::fs::remove_dir_all(&local);
+        })
+        .await;
+    }
     // And read the directory back the way a panel does: the read path asks
     // `parent_row` first and prepends it, then drains the channel.
     let mut names: Vec<String> = Vfs::parent_row(router.as_ref(), &here)
@@ -527,15 +556,31 @@ async fn a_panel_reads_a_real_server_through_the_vfs_trait() {
         names.iter().any(|n| n == "through-the-trait.txt"),
         "the write is visible in the listing: {names:?}"
     );
+    assert!(
+        names.iter().all(|n| !n.contains("hcmd-partial")),
+        "the copy left nothing half-written beside the file: {names:?}"
+    );
+    {
+        let router = Arc::clone(&router);
+        let target = target.clone();
+        let bytes = blocking(move || {
+            let mut reader = Vfs::open_read(router.as_ref(), &target).expect("open_read");
+            let mut out = Vec::new();
+            std::io::Read::read_to_end(&mut reader, &mut out).expect("read");
+            out
+        })
+        .await;
+        assert_eq!(bytes, b"the newer copy", "the copy replaced the old file");
+    }
 
-    // `stat` and `open_read` agree with what was written.
+    // `stat` and `open_read` agree with what was written - by the copy, last.
     let entry = {
         let router = Arc::clone(&router);
         let target = target.clone();
         blocking(move || Vfs::stat(router.as_ref(), &target)).await
     }
     .expect("stat");
-    assert_eq!(entry.size, 11);
+    assert_eq!(entry.size, 14);
     let body = {
         let router = Arc::clone(&router);
         let target = target.clone();
@@ -547,7 +592,7 @@ async fn a_panel_reads_a_real_server_through_the_vfs_trait() {
         })
         .await
     };
-    assert_eq!(body, b"panel bytes");
+    assert_eq!(body, b"the newer copy");
 
     // A path naming a connection nobody registered is refused rather than
     // serviced, which is what makes two tabs on two hosts two namespaces.
@@ -656,6 +701,24 @@ async fn the_whole_transport_against_a_real_sftp_server() {
         blocking(move || fs.stat(&file)).await.expect("stat")
     };
     assert_eq!(stat.size, body.len() as u64);
+
+    // The date a copy carries over: SETSTAT, read back off the server's disk.
+    let when = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_600_000_000);
+    {
+        let fs = Arc::clone(&fs);
+        let file = file.clone();
+        blocking(move || fs.set_mtime(&file, when))
+            .await
+            .expect("set the date");
+    }
+    assert_eq!(
+        std::fs::metadata(server.serving.join("sub").join("payload.bin"))
+            .expect("on disk")
+            .modified()
+            .expect("a date"),
+        when,
+        "the server stamped the file with the date it was given"
+    );
 
     // Download, through the pipelined reader.
     let got = {

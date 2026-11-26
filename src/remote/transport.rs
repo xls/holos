@@ -100,6 +100,19 @@ pub trait RemoteTransport: Send + Sync {
     ///
     fn rename(&self, from: &str, to: &str) -> Result<()>;
 
+    /// Set one file's modification time, where the protocol can.
+    ///
+    /// **Blocking.** Call from the blocking pool only.
+    ///
+    /// The default is a refusal: SFTP has `SETSTAT`, and a protocol without an
+    /// equivalent keeps the date the server gave the upload.
+    fn set_mtime(&self, path: &str, mtime: std::time::SystemTime) -> Result<()> {
+        let _ = (path, mtime);
+        Err(crate::Error::Unsupported(
+            "setting a file's date over this protocol",
+        ))
+    }
+
     /// False once the connection is gone.
     ///
     /// **Never does I/O**: it reads a flag the actor sets, because the panel
@@ -146,6 +159,14 @@ pub struct FakeTransport {
     /// The largest buffer any reader was handed, for the chunk-size test
     /// (the design I12).
     max_read: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// The dates set with `set_mtime`, by path. Only an SFTP-shaped fake
+    /// takes them; the FTP one refuses, as the protocol does.
+    stamped: std::sync::Mutex<std::collections::BTreeMap<String, std::time::SystemTime>>,
+    /// How many bytes one upload may write before the "disk" is full. `None`
+    /// is unlimited. A limited fake writes as it goes, the way SFTP does, so
+    /// a failed upload leaves what it had written - which is the case a copy
+    /// has to cope with.
+    capacity: Option<usize>,
 }
 
 /// One node of [`FakeTransport`]'s tree.
@@ -177,7 +198,33 @@ impl FakeTransport {
             list_delay: std::sync::Mutex::new(std::time::Duration::ZERO),
             injected: std::sync::Mutex::new(Vec::new()),
             max_read: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            stamped: std::sync::Mutex::new(std::collections::BTreeMap::new()),
+            capacity: None,
         }
+    }
+
+    /// A file's bytes, or `None` when there is no such file.
+    pub fn file_bytes(&self, path: &str) -> Option<Vec<u8>> {
+        match self.map().get(path) {
+            Some(Node::File(bytes)) => Some(bytes.clone()),
+            Some(Node::Dir | Node::Link(_)) | None => None,
+        }
+    }
+
+    /// Every path in the tree.
+    pub fn paths(&self) -> Vec<String> {
+        self.map().keys().cloned().collect()
+    }
+
+    /// Fill the "disk" after this many bytes of any one upload.
+    pub const fn with_capacity(mut self, bytes: usize) -> Self {
+        self.capacity = Some(bytes);
+        self
+    }
+
+    /// The date `set_mtime` last gave `path`.
+    pub fn stamped(&self, path: &str) -> Option<std::time::SystemTime> {
+        self.stamped.lock().ok()?.get(path).copied()
     }
 
     /// The same, claiming to be FTP: no seeking, no modes, no links.
@@ -423,6 +470,7 @@ impl RemoteTransport for FakeTransport {
             path: path.to_string(),
             buffer: Vec::new(),
             tree: std::sync::Arc::clone(&self.tree),
+            capacity: self.capacity,
         }))
     }
 
@@ -442,6 +490,19 @@ impl RemoteTransport for FakeTransport {
 
     fn remove_dir(&self, path: &str) -> Result<()> {
         self.remove_file(path)
+    }
+
+    fn set_mtime(&self, path: &str, mtime: std::time::SystemTime) -> Result<()> {
+        self.charge(path)?;
+        if self.protocol != Protocol::Sftp {
+            return Err(crate::Error::Unsupported(
+                "setting a file's date over this protocol",
+            ));
+        }
+        if let Ok(mut stamped) = self.stamped.lock() {
+            stamped.insert(path.to_string(), mtime);
+        }
+        Ok(())
     }
 
     fn rename(&self, from: &str, to: &str) -> Result<()> {
@@ -497,12 +558,33 @@ struct FakeWriter {
     buffer: Vec<u8>,
     /// The tree to commit into.
     tree: std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<String, Node>>>,
+    /// See [`FakeTransport::with_capacity`].
+    capacity: Option<usize>,
 }
 
 #[cfg(test)]
 impl std::io::Write for FakeWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.buffer.extend_from_slice(buf);
+        if let Some(capacity) = self.capacity {
+            // Written through as it arrives, as SFTP writes, so a full disk
+            // leaves the part that fitted at the path.
+            let fitted = self.buffer.len().min(capacity);
+            let mut map = self
+                .tree
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            map.insert(
+                self.path.clone(),
+                Node::File(self.buffer.get(..fitted).unwrap_or_default().to_vec()),
+            );
+            if self.buffer.len() > capacity {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::StorageFull,
+                    "no space left on device",
+                ));
+            }
+        }
         Ok(buf.len())
     }
 

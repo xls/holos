@@ -1048,6 +1048,26 @@ impl RemoteTransport for SftpFs {
         })
     }
 
+    /// **Blocking.** Call from the blocking pool only.
+    ///
+    /// SFTP version 3 sets the two times together, so the access time is set
+    /// to the same moment: there is no "leave it alone" for one of them.
+    fn set_mtime(&self, path: &str, mtime: std::time::SystemTime) -> Result<()> {
+        let path = attrs::normalise(path);
+        let secs = mtime
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|d| u32::try_from(d.as_secs()).ok())
+            .ok_or(crate::Error::Unsupported(
+                "a date SFTP cannot carry (before 1970 or after 2106)",
+            ))?;
+        self.ask(|reply| Command::SetTimes {
+            path: path.clone(),
+            secs,
+            reply,
+        })
+    }
+
     /// Never does I/O: it reads a flag the actor and russh's handler set.
     /// The panel asks this on every frame.
     fn is_live(&self) -> bool {

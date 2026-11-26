@@ -417,6 +417,17 @@ impl Vfs for RemoteFs {
         self.note(self.transport.read_link(&remote))
     }
 
+    /// **Blocking.** Call from the blocking pool only.
+    ///
+    /// The listing that holds the file is dropped from the cache, so the panel
+    /// shows the new date rather than the upload time it read before.
+    fn set_mtime(&self, path: &VfsPath, mtime: std::time::SystemTime) -> Result<()> {
+        let remote = self.remote_path(path)?;
+        let outcome = self.note(self.transport.set_mtime(&remote, mtime));
+        self.invalidate(Some(&Self::parent_dir(&remote)));
+        outcome
+    }
+
     /// The value fixed when the connection was established. **Never does
     /// I/O**.
     fn capabilities(&self) -> Capabilities {

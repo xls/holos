@@ -2255,6 +2255,14 @@ impl Viewer {
         self.diff_old = Some(other);
     }
 
+    /// Show the diff first, whatever the file is: a diff that was asked for
+    /// by name - compare files, `Alt+Shift+F2`, `F3` in the sync view - is the
+    /// answer, and opening on the file's own document (a Markdown page, a
+    /// JSON tree) answered a different question. `Alt+D` still swaps.
+    pub const fn show_diff_first(&mut self) {
+        self.diff_shown = true;
+    }
+
     /// Record what git says about this file, for the status line.
     ///
     /// Separate from [`Viewer::set_diff_side`] because the two answers are

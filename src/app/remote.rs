@@ -467,6 +467,50 @@ impl App {
         true
     }
 
+    /// Connect one panel to `target`, signing in the way the host book says
+    /// about that host - the plan a reconnect uses. For a saved sync, whose
+    /// remote side is an address and nothing more.
+    pub(crate) fn connect_side(&mut self, side: Side, target: Target) {
+        let home =
+            crate::config::paths::home_dir().unwrap_or_else(|_| std::path::PathBuf::from("/"));
+        let saved = self
+            .hosts
+            .hosts()
+            .iter()
+            .find(|h| {
+                let t = h.target();
+                t.protocol == target.protocol
+                    && t.host == target.host
+                    && t.port == target.port
+                    && t.user == target.user
+            })
+            .cloned();
+        let plan = match (&saved, target.protocol.verifies_host_key()) {
+            (Some(host), true) => AuthPlan::for_host(host, &home),
+            (host, false) => AuthPlan::for_password_login(host.as_ref()),
+            (None, true) => AuthPlan::for_host(&SavedHost::default(), &home),
+        };
+        let tab = self.panel(side).active_index();
+        let origin = self.panel(side).active_tab().path.clone();
+        let attempt = self.next_connect_id();
+        self.message = Some(format!("Connecting to {}...", target.authority()));
+        self.request_connect(ConnectRequest {
+            answer: Box::new(crate::dialog::ConnectAnswer {
+                target,
+                plan,
+                password: None,
+                local_dir: None,
+                hosts: None,
+            }),
+            side,
+            tab,
+            origin,
+            origin_cursor: None,
+            attempt,
+            reconnect: None,
+        });
+    }
+
     /// Record that a target's password now lives in the keyring.
     ///
     ///

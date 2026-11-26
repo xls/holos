@@ -617,11 +617,58 @@ pub(crate) fn copy_one_via_vfs(
         };
     }
 
-    let mut writer = vfs.open_write(dst)?;
-    // rule 3: the chunk comes from `Capabilities`, not from a
-    // constant. A `LatencyClass::Network` backend copies in larger chunks than
-    // a local one, which is the difference between a round trip per 256 KiB
-    // and one per megabyte.
+    // Through a temporary name where the backend renames atomically, which is
+    // what a local copy does with its partial file and for the same reason:
+    // an upload that fails half way - a full disk, a dropped connection, a
+    // cancel - must not leave a cut-off file under the real name, and must
+    // not have destroyed the copy that was there before it started.
+    let staged = vfs.capabilities_for(dst).atomic_rename;
+    let target = match (staged, dst.parent(), dst.file_name()) {
+        (true, Some(dir), Some(name)) => dir.join(format!(".{name}.hcmd-partial")),
+        _ => dst.clone(),
+    };
+    let written = write_through(vfs, reader.as_mut(), &target, dst, ctx);
+    if let Err(err) = written {
+        if target != *dst {
+            let _ = vfs.remove(&target);
+        }
+        return Err(err);
+    }
+    if target != *dst {
+        place(vfs, &target, dst)?;
+    }
+    // The date, after the commit: a server stamps a file when it is written,
+    // and a copy dated by its arrival reads as newer than its original to the
+    // next comparison. A backend that cannot set one keeps its own date; that
+    // is not a failed copy.
+    if options.preserve_attrs
+        && let Some(mtime) = entry.mtime
+    {
+        // Only a lost connection matters here: it fails every file after this
+        // one too, and stopping is what the batch does about that.
+        if let Err(err) = vfs.set_mtime(dst, mtime)
+            && crate::ops::is_fatal(&err)
+        {
+            return Err(err);
+        }
+    }
+    Ok(())
+}
+
+/// Stream `reader` into `target` through the trait, sized for `dst`'s
+/// backend, and commit it.
+fn write_through(
+    vfs: &dyn Vfs,
+    reader: &mut dyn Read,
+    target: &VfsPath,
+    dst: &VfsPath,
+    ctx: &mut JobContext,
+) -> Result<()> {
+    let mut writer = vfs.open_write(target)?;
+    // rule 3: the chunk comes from `Capabilities`, not from a constant. A
+    // `LatencyClass::Network` backend copies in larger chunks than a local
+    // one, which is the difference between a round trip per 256 KiB and one
+    // per megabyte.
     let chunk = crate::ops::chunk_size(&vfs.capabilities_for(dst));
     let mut buf = vec![0u8; chunk];
     loop {
@@ -643,6 +690,20 @@ pub(crate) fn copy_one_via_vfs(
     // here, where a caller is checking, rather than by a `drop` nobody can.
     writer.flush()?;
     Ok(())
+}
+
+/// Put a finished upload in its place. A server that will not rename onto
+/// an existing file (SFTP version 3) has the old one removed first - only
+/// now, with the new one complete beside it.
+fn place(vfs: &dyn Vfs, staged: &VfsPath, dst: &VfsPath) -> Result<()> {
+    let Err(first) = vfs.rename(staged, dst) else {
+        return Ok(());
+    };
+    if vfs.stat(dst).is_ok() && vfs.remove(dst).is_ok() && vfs.rename(staged, dst).is_ok() {
+        return Ok(());
+    }
+    let _ = vfs.remove(staged);
+    Err(first)
 }
 
 /// Copy a symlink that is not on this machine as a link.

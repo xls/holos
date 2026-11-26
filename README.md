@@ -141,11 +141,17 @@ by columns 2 to 4, and `Ctrl+1` to `Ctrl+9` sort by any column.
 ### Keep both sides in view
 
 Work with your source and destination side by side. Open **up to nine tabs per
-panel**, jump to bookmarked directories, and preview a file in the opposite
-panel without leaving the listing.
+panel**, jump to bookmarked directories, and preview a file, pictures included,
+in the opposite panel without leaving the listing.
 
 Copy and move with familiar function keys. Queue long operations in the
 background, follow their progress, and keep browsing while they run.
+`Ctrl+Shift+L` sizes every folder in the listing, so the biggest sort to the top.
+
+**Synchronize two folders (`Ctrl+Alt+S`).** Both panels list the two trees row
+for row, local or remote, with what differs marked and an arrow for where each
+file goes: one way, both ways or mirror. Nothing is written until you confirm,
+and a pair can be saved to open again in one step.
 
 **Two-panel browsing.** Source and destination side by side, with tabs and familiar function keys.
 
@@ -216,6 +222,8 @@ architecture, with the corresponding regions highlighted in hex mode.
 
 **The viewer (`F3`).** Syntax highlighting, line numbers and selection details in the active theme.
 
+**Compare two files (`Ctrl+Alt+C`, `Alt+Shift+F2`).** Text files that differ open as a diff; binary ones say where they stop agreeing.
+
 [![Hex viewer showing a PNG header, byte offsets and ASCII](docs/hexviewer.png)](docs/hexviewer.png)
 
 **Hex mode.** Inspect a file's bytes, with offsets and ASCII side by side.
@@ -283,6 +291,7 @@ Uncomment a setting to override its default.
 - **`themes/`**: your custom theme files.
 - **`hotlist.toml`**: directory bookmarks: `Ctrl+D`, and below the drives in `Alt+F1` / `Alt+F2`. A `&` in a label makes the next letter its key, as in Total Commander; in the popup `F2` renames, `Del` removes and `Shift+Up/Down` reorders.
 - **`hosts.toml`**: saved remote connections.
+- **`syncs.toml`**: saved folder pairs for `Ctrl+Alt+S`.
 
 All 21 themes are built into the binary. To customise one, copy its installed
 file from `~/.local/share/hcmd/themes/` into `~/.config/holoscommander/themes/`

@@ -46,9 +46,12 @@ stated, not hidden.
   beside the middle border. What differs starts marked; unmark to skip,
   `Left`/`Right` to point a file the other way. `Alt+M` steps the mode (one
   way, both ways, mirror) and the arrows follow; `Alt+C` also reads files whose
-  size and date match, to catch silent changes; `F5` runs it after asking.
-- Compare the two files under the cursors byte for byte, for a same-or-differs
-  verdict.
+  size and date match, to catch silent changes; `F3` diffs a row; `F5` runs it
+  after asking and compares again. A finished sync can be remembered, remote
+  sides included, and reopened from `Ctrl+Alt+S`.
+- Compare two files byte for byte for a same-or-differs verdict, or diff them
+  (`Alt+Shift+F2`): the one marked file on each side, else the files under the
+  cursors.
 - Checksums: write and verify SHA-256 (`.sha256`) and CRC32 (`.sfv`), compatible
   with `sha256sum -c`.
 - Symbolic and hard links, and permission editing, offered only where the

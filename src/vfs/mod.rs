@@ -1178,6 +1178,21 @@ pub trait Vfs: Send + Sync {
         unsupported("reading a symbolic link on this backend")
     }
 
+    /// Set a file's modification time.
+    ///
+    /// What a copy calls after writing, so the copy carries the original's
+    /// date: without it a file copied to a server is dated the moment it
+    /// arrived, and the next comparison - `Shift+F2`, a sync - calls the copy
+    /// newer than what it was copied from.
+    ///
+    /// The default is a refusal, which a copy takes in its stride: a backend
+    /// whose protocol cannot set a date (S3 dates an object by its upload)
+    /// simply keeps the date it gives.
+    fn set_mtime(&self, path: &VfsPath, mtime: std::time::SystemTime) -> Result<()> {
+        let _ = (path, mtime);
+        unsupported("setting a file's date on this backend")
+    }
+
     /// Create a symbolic link at `link` pointing at `target`.
     ///
     /// `target` is text and is **not** resolved here: a symbolic link is

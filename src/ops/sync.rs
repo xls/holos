@@ -391,12 +391,20 @@ pub fn check_contents(
     direction: Direction,
     mirror: bool,
     cancelled: &dyn Fn() -> bool,
+    progress: &mut dyn FnMut(usize, usize),
 ) -> crate::Result<usize> {
     let mut unreadable = 0_usize;
-    for row in rows.iter_mut().filter(|row| row.status == Status::Same) {
+    let total = rows.iter().filter(|row| row.status == Status::Same).count();
+    progress(0, total);
+    for (done, row) in rows
+        .iter_mut()
+        .filter(|row| row.status == Status::Same)
+        .enumerate()
+    {
         if cancelled() {
             return Err(Error::Cancelled);
         }
+        progress(done, total);
         let a = under(left_root, &row.rel);
         let b = under(right_root, &row.rel);
         let mut tick = |_: u64| !cancelled();

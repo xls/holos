@@ -181,8 +181,8 @@ actions! {
     CompareDirs       = "compare_dirs",      V07, "Compare the two file lists";
     CompareDirsContent = "compare_dirs_content", V09, "Compare the two file lists by content";
     SyncDirs          = "sync_dirs",         V09, "Synchronize the two panels' directories";
-    CompareFiles      = "compare_files",     V09, "Compare the two files byte for byte";
-    DiffFiles         = "diff_files",        V09, "Show the two files as a diff";
+    CompareFiles      = "compare_files",     V09, "Compare the two files byte for byte (the marked one on each side, else the cursor)";
+    DiffFiles         = "diff_files",        V09, "Show the two files as a diff (the marked one on each side, else the cursor)";
     ToggleDiff        = "toggle_diff",       V09, "Swap mode 3 between the document and the diff";
     GitHistory        = "git_history",       V09, "Browse the git history of the current directory";
     ChecksumCreate    = "checksum_create",   V09, "Write a checksum file for the selection";

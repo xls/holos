@@ -728,6 +728,55 @@ fn the_quick_view_shows_the_picture_without_its_info_box() {
     assert!(!screen.contains(" Info "), "{screen}");
 }
 
+/// One marked file on each side is what the diff compares, whatever the
+/// cursors are on: two files with different names can be set side by side.
+#[test]
+fn the_diff_takes_the_one_marked_file_on_each_side_before_the_cursor() {
+    use holoscommander::app::ViewRequest;
+    let mut app = app_with(Config::default());
+    seed(
+        &mut app,
+        Side::Left,
+        Path::new("/l"),
+        vec![file("a.txt", 1, 1), file("old-name.txt", 1, 1)],
+    );
+    seed(
+        &mut app,
+        Side::Right,
+        Path::new("/r"),
+        vec![file("b.txt", 1, 1), file("new-name.txt", 1, 1)],
+    );
+    // Cursors on the first rows, which is what is compared with nothing marked.
+    app.diff_files();
+    let Some(ViewRequest::Diff { old, new }) = app.take_pending_view() else {
+        panic!("a diff of the cursors");
+    };
+    assert_eq!(
+        (old, new),
+        (VfsPath::local("/l/a.txt"), VfsPath::local("/r/b.txt"))
+    );
+
+    app.left
+        .active_tab_mut()
+        .marks
+        .insert("old-name.txt".to_string());
+    app.right
+        .active_tab_mut()
+        .marks
+        .insert("new-name.txt".to_string());
+    app.diff_files();
+    let Some(ViewRequest::Diff { old, new }) = app.take_pending_view() else {
+        panic!("a diff of the marks");
+    };
+    assert_eq!(
+        (old, new),
+        (
+            VfsPath::local("/l/old-name.txt"),
+            VfsPath::local("/r/new-name.txt")
+        )
+    );
+}
+
 fn expire_debounce(app: &mut App) {
     let Some(quick) = app.quick.as_deref_mut() else {
         return;

@@ -347,6 +347,15 @@ impl Vfs for LocalFs {
             .ok_or_else(|| Error::InvalidPath(format!("{path}: the link target is not UTF-8")))
     }
 
+    fn set_mtime(&self, path: &VfsPath, mtime: std::time::SystemTime) -> Result<()> {
+        let at = Self::resolve(path)?;
+        fs::File::options()
+            .write(true)
+            .open(at)
+            .and_then(|file| file.set_modified(mtime))
+            .map_err(|e| Error::io(at, e))
+    }
+
     fn capabilities(&self) -> Capabilities {
         Capabilities::LOCAL
     }

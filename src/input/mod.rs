@@ -217,6 +217,12 @@ pub enum DialogId {
     Resize,
     /// The sync view's "synchronize these?" question.
     Sync,
+    /// "Remember this sync?", after a run.
+    SyncRemember,
+    /// `Ctrl+Alt+S` with saved syncs: the panels, or a saved pair.
+    SyncPicker,
+    /// `F2` in that list: a saved sync's name.
+    SyncRename,
 }
 
 impl DialogId {
@@ -281,6 +287,9 @@ impl DialogId {
             Self::FileSummary => "file_summary",
             Self::Resize => "resize",
             Self::Sync => "sync",
+            Self::SyncRemember => "sync_remember",
+            Self::SyncPicker => "sync_picker",
+            Self::SyncRename => "sync_rename",
         }
     }
 }
@@ -1338,7 +1347,7 @@ pub(crate) fn run_action(app: &mut App, action: Action, press: KeyPress) -> Resu
         A::Downloads => app.show_downloads(),
         A::Serve => app.request_serve(),
         A::SendDevice => app.request_send_device(),
-        A::SyncDirs => app.request_sync(),
+        A::SyncDirs => app.open_sync(),
 
         // -------------------------------------------- the design compare -
         A::CompareDirs => app.compare_lists(),

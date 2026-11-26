@@ -3,7 +3,7 @@
 //! The panels are showing the view, so a panel key means the view's version
 //! of it: the cursor keys move the one cursor both panels share, `Space` and
 //! `Ins` unmark or re-mark a row, `F5` runs what the panels show (after
-//! asking), `F3` views the file on the active side. A few keys are the view's
+//! asking), `F3` shows the row's two copies as a diff. A few keys are the view's
 //! own: `Left` and `Right` point a row, `=` shows identical files, `Alt+M`
 //! (or `Shift+F5`) steps the mode - one way, both ways, mirror - and `Alt+C`
 //! turns the byte check on and off: files whose size and date match are read
@@ -17,7 +17,6 @@
 use super::{Action, KeyCode, KeyContext, KeyModifiers, KeyPress, Resolution, run_action};
 use crate::Result;
 use crate::app::App;
-use crate::panel::Side;
 
 /// Route one key while the sync view is up.
 pub(super) fn sync_key(app: &mut App, press: KeyPress) -> Result<()> {
@@ -69,7 +68,6 @@ pub(super) fn sync_key(app: &mut App, press: KeyPress) -> Result<()> {
 }
 
 fn sync_action(app: &mut App, action: Action, press: KeyPress) -> Result<()> {
-    let left = app.active_side == Side::Left;
     let Some(view) = app.sync_view_mut() else {
         return Ok(());
     };
@@ -85,10 +83,14 @@ fn sync_action(app: &mut App, action: Action, press: KeyPress) -> Result<()> {
             view.move_to(last);
         }
         Action::ToggleSelect => {
-            view.toggle_mark();
+            let said = view.toggle_mark();
             view.move_by(1);
+            app.message = Some(said.to_string());
         }
-        Action::SelectAndSize => view.toggle_mark(),
+        Action::SelectAndSize => {
+            let said = view.toggle_mark();
+            app.message = Some(said.to_string());
+        }
         Action::ClearSearch => {
             if !view.search_clear() {
                 app.leave_sync();
@@ -98,9 +100,15 @@ fn sync_action(app: &mut App, action: Action, press: KeyPress) -> Result<()> {
         // `Shift+F5` steps the mode too: shift is what makes a run go both
         // ways, and the arrows say so before `F5` runs it.
         Action::CopySameDir => view.cycle_mode(),
-        Action::View => match view.current_path(left) {
-            Some(path) => app.request_view(crate::app::ViewRequest::File { path, at: None }),
-            None => app.message = Some("this side has no such file".to_string()),
+        // The row's two copies as a diff, left against right, which is what a
+        // reader of a sync wants to know about a file that differs; a file on
+        // one side only is shown as itself.
+        Action::View => match (view.current_path(true), view.current_path(false)) {
+            (Some(old), Some(new)) => app.request_view(crate::app::ViewRequest::Diff { old, new }),
+            (Some(path), None) | (None, Some(path)) => {
+                app.request_view(crate::app::ViewRequest::File { path, at: None });
+            }
+            (None, None) => {}
         },
         Action::SyncDirs => app.leave_sync(),
         Action::OtherPanel => {

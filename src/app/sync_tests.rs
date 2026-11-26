@@ -102,6 +102,20 @@ fn ctrl_alt_s_turns_the_panels_into_the_view_and_the_scan_fills_it() {
         jobs[0].spec.targets,
         [VfsPath::local(right.path()).join("new.txt")]
     );
+
+    // The job done, the trees are compared again and the pair is offered for
+    // saving.
+    app.forget_job(jobs[0].id);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !app
+        .dialogs()
+        .iter()
+        .any(|f| f.dialog.id() == DialogId::SyncRemember)
+    {
+        app.service_sync();
+        assert!(Instant::now() < deadline, "asked to remember the sync");
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 #[test]

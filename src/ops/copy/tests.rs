@@ -58,9 +58,45 @@ impl TempTree {
 }
 
 impl Drop for TempTree {
+    /// Gone afterwards even when a test chmod-ed something to 0 inside it:
+    /// `remove_dir_all` cannot enter such a directory, and the copy of one a
+    /// test makes keeps its mode, so every directory gets its bits back first.
+    /// Without this each run left a tree behind in the temp directory.
     fn drop(&mut self) {
+        relax(&self.0);
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+/// Give `path` and everything under it back its permission bits.
+fn relax(path: &Path) {
+    let Ok(meta) = fs::symlink_metadata(path) else {
+        return;
+    };
+    if meta.file_type().is_symlink() {
+        return;
+    }
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));
+    if !meta.is_dir() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        relax(&entry.path());
+    }
+}
+
+#[test]
+fn a_temp_tree_with_an_unreadable_directory_still_goes_away() {
+    let t = TempTree::new("relax");
+    t.file("a/locked/b.txt", b"b");
+    fs::set_permissions(t.path().join("a/locked"), fs::Permissions::from_mode(0o000))
+        .expect("chmod");
+    let root = t.path().to_path_buf();
+    drop(t);
+    assert!(!root.exists(), "{} was left behind", root.display());
 }
 
 /// A router with one live connection over an in-memory transport.
@@ -145,6 +181,141 @@ fn a_lost_connection_stops_the_batch_instead_of_failing_every_file() {
         "the fourth file was attempted after the connection had gone"
     );
     assert!(!transport.is_live(), "the transport knows it has gone");
+}
+
+/// A file copied to a server keeps its date, so the next comparison calls
+/// the two the same rather than the copy newer; one copied to a protocol that
+/// cannot set a date is still copied.
+#[test]
+fn an_upload_keeps_the_files_date_where_the_protocol_can_set_one() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("a runtime");
+    let _guard = runtime.enter();
+
+    let tree = TempTree::new("stamp");
+    let src = tree.file("report.txt", b"the report");
+    let when = UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    fs::File::options()
+        .write(true)
+        .open(&src)
+        .expect("open")
+        .set_modified(when)
+        .expect("set the date");
+
+    for (transport, stamps) in [
+        (crate::remote::transport::FakeTransport::new(), true),
+        (crate::remote::transport::FakeTransport::ftp(), false),
+    ] {
+        let (transport, router, id) = remote_router(transport.with_dir("/srv"));
+        let spec = JobSpec::new(
+            JobKind::Copy,
+            vec![VfsPath::local(&src)],
+            Some(id.path("/srv")),
+        );
+        let (mut ctx, rx, _dtx, _flag) = JobContext::for_test(spec.kind);
+        run(router.as_ref(), &spec, &mut ctx);
+        let summary = ctx.finish();
+        drop(rx);
+        assert!(summary.failures.is_empty(), "{:?}", summary.failures);
+        assert_eq!(summary.files_done, 1);
+        let expected = stamps.then_some(when);
+        assert_eq!(transport.stamped("/srv/report.txt"), expected);
+    }
+}
+
+/// An upload that fails half way - here the server's disk fills - leaves the
+/// copy that was there before untouched, and no cut-off file under any name.
+#[test]
+fn a_full_disk_on_the_server_keeps_the_old_copy_and_leaves_no_partial() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("a runtime");
+    let _guard = runtime.enter();
+
+    let tree = TempTree::new("full");
+    let src = tree.file("report.txt", &[b'n'; 100]);
+    let (transport, router, id) = remote_router(
+        crate::remote::transport::FakeTransport::new()
+            .with_dir("/srv")
+            .with_file("/srv/report.txt", b"the previous good copy")
+            .with_capacity(40),
+    );
+    let spec = JobSpec::new(
+        JobKind::Copy,
+        vec![VfsPath::local(&src)],
+        Some(id.path("/srv")),
+    )
+    .with_options(crate::ops::JobOptions {
+        conflict: Some(ConflictChoice::Overwrite),
+        ..crate::ops::JobOptions::default()
+    });
+    let (mut ctx, rx, _dtx, _flag) = JobContext::for_test(spec.kind);
+    run(router.as_ref(), &spec, &mut ctx);
+    let summary = ctx.finish();
+    drop(rx);
+
+    assert_eq!(summary.failures.len(), 1, "the full disk is reported");
+    assert_eq!(
+        transport.file_bytes("/srv/report.txt").as_deref(),
+        Some(&b"the previous good copy"[..]),
+        "the old copy is untouched"
+    );
+    assert!(
+        transport
+            .paths()
+            .iter()
+            .all(|p| !p.contains("hcmd-partial")),
+        "and nothing half-written is left: {:?}",
+        transport.paths()
+    );
+}
+
+/// A finished upload replaces the old copy, with nothing left beside it.
+#[test]
+fn a_finished_upload_replaces_the_old_copy() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("a runtime");
+    let _guard = runtime.enter();
+
+    let tree = TempTree::new("replace");
+    let src = tree.file("report.txt", b"the new copy");
+    let (transport, router, id) = remote_router(
+        crate::remote::transport::FakeTransport::new()
+            .with_dir("/srv")
+            .with_file("/srv/report.txt", b"old"),
+    );
+    let spec = JobSpec::new(
+        JobKind::Copy,
+        vec![VfsPath::local(&src)],
+        Some(id.path("/srv")),
+    )
+    .with_options(crate::ops::JobOptions {
+        conflict: Some(ConflictChoice::Overwrite),
+        ..crate::ops::JobOptions::default()
+    });
+    let (mut ctx, rx, _dtx, _flag) = JobContext::for_test(spec.kind);
+    run(router.as_ref(), &spec, &mut ctx);
+    let summary = ctx.finish();
+    drop(rx);
+    assert!(summary.failures.is_empty(), "{:?}", summary.failures);
+    assert_eq!(
+        transport.file_bytes("/srv/report.txt").as_deref(),
+        Some(&b"the new copy"[..])
+    );
+    assert!(
+        transport
+            .paths()
+            .iter()
+            .all(|p| !p.contains("hcmd-partial"))
+    );
 }
 
 /// a recursive download cannot be steered out of the
