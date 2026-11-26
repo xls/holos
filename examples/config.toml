@@ -437,7 +437,9 @@ keyboard_protocol = "auto"
 colors = "auto"
 # How pictures are drawn in the viewer: "auto" asks the terminal, then
 # "kitty", "sixel" or "iterm2" for its graphics protocol, "halfblocks"
-# for coloured character cells that work anywhere, "off" for none.
+# for coloured character cells that work anywhere, "blocks" for coloured
+# cells without the half-block character (macOS Terminal, where half
+# blocks come out striped), "off" for none.
 graphics = "auto"
 
 # Bind a raw escape sequence to a logical key for terminals that need it.

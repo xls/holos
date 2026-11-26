@@ -150,3 +150,20 @@ fn only_sixel_and_iterm2_write_into_the_cells() {
     assert!(!Protocol::Halfblocks.is_pixels());
     assert!(Protocol::Kitty.is_pixels());
 }
+
+#[test]
+fn macos_terminal_gets_coloured_cells_rather_than_striped_half_blocks() {
+    assert_eq!(
+        from_env(env(&[
+            ("TERM_PROGRAM", "Apple_Terminal"),
+            ("TERM", "xterm-256color")
+        ])),
+        Some(Protocol::Blocks)
+    );
+    assert_eq!(parse_setting("blocks"), Some(GraphicsSetting::Blocks));
+    assert_eq!(
+        resolve(GraphicsSetting::Blocks, None, None),
+        Protocol::Blocks
+    );
+    assert!(!Protocol::Blocks.is_pixels() && !Protocol::Blocks.writes_cells());
+}

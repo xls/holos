@@ -222,7 +222,7 @@ pub fn draw(f: &mut Frame, app: &App, viewer: &Viewer, body: Rect) {
         return;
     };
     match app.graphics {
-        Protocol::Halfblocks => paint_half_blocks(f, app, viewer, cells),
+        Protocol::Halfblocks | Protocol::Blocks => paint_half_blocks(f, app, viewer, cells),
         // The picture is sent after the frame. Its cells are left alone by the
         // frame diff, or the text drawn into them would replace it.
         Protocol::Sixel | Protocol::Iterm2 => {
@@ -251,14 +251,17 @@ fn skip(f: &mut Frame, cells: Rect) {
 }
 
 /// The picture as `▀` cells, top pixel in the foreground, bottom in the
-/// background. Under `ui.ascii_borders` a space in the two pixels' average,
-/// since the half block is not ASCII.
+/// background. Under `ui.ascii_borders`, and under the `blocks` style for a
+/// terminal that draws `▀` short of the cell, a space in the two pixels'
+/// average: a background always fills the whole cell.
 fn paint_half_blocks(f: &mut Frame, app: &App, viewer: &Viewer, cells: Rect) {
     let Some(scaled) = viewer.scaled_picture() else {
         return;
     };
     let bg = background(app);
-    let ascii = app.config.ui.ascii_borders;
+    // Coloured spaces under ASCII borders, where `▀` is not allowed, and under
+    // `blocks`, for a terminal that draws `▀` short of the cell.
+    let ascii = app.config.ui.ascii_borders || app.graphics == Protocol::Blocks;
     let colour = |[r, g, b]: [u8; 3]| app.theme.quantize(Rgb { r, g, b }, app.color_depth);
     let buf = f.buffer_mut();
     for row in 0..cells.height {

@@ -1386,6 +1386,10 @@ pub enum GraphicsSetting {
     Iterm2,
     /// Two pixels per character cell, coloured: any colour terminal.
     Halfblocks,
+    /// One colour per cell, drawn as a coloured space: for a terminal that
+    /// draws the half-block character from its font and leaves stripes
+    /// (macOS Terminal). Half the detail, never striped.
+    Blocks,
     /// No pictures: an image opens as its summary.
     Off,
 }
@@ -1419,7 +1423,9 @@ pub struct TerminalConfig {
     pub colors: ColorDepthSetting,
     /// How pictures are drawn in the viewer: "auto" asks the terminal, then
     /// "kitty", "sixel" or "iterm2" for its graphics protocol, "halfblocks"
-    /// for coloured character cells that work anywhere, "off" for none.
+    /// for coloured character cells that work anywhere, "blocks" for coloured
+    /// cells without the half-block character (macOS Terminal, where half
+    /// blocks come out striped), "off" for none.
     pub graphics: GraphicsSetting,
     /// Raw escape sequences bound to logical keys, for terminals that need it.
     /// Skipped from the generated file and shown only as the commented example

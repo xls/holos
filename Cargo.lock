@@ -2829,7 +2829,7 @@ dependencies = [
 
 [[package]]
 name = "holoscommander"
-version = "0.17.11"
+version = "0.17.12"
 dependencies = [
  "bzip2",
  "chardetng",

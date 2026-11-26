@@ -2,6 +2,10 @@
 
 Notable changes per release, one line each. Newest first.
 
+## v0.17.12
+
+- macOS Terminal draws pictures as coloured cells instead of half blocks, which it rendered with a stripe in every row; `[terminal] graphics = "blocks"` picks this anywhere.
+
 ## v0.17.11
 
 - Uploads to a remote go through a temporary name and replace the file only when complete: a failed upload (a full disk, a dropped connection) keeps the previous copy instead of leaving a cut-off file.

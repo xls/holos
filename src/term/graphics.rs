@@ -51,6 +51,9 @@ pub enum Protocol {
     /// Coloured `▀` cells.
     #[default]
     Halfblocks,
+    /// Coloured spaces, one colour per cell: for a terminal that draws `▀`
+    /// from its font, short of the cell, and leaves a stripe in every row.
+    Blocks,
     /// No pictures.
     Off,
 }
@@ -79,6 +82,7 @@ impl Protocol {
             Self::Sixel => "sixel",
             Self::Iterm2 => "iterm2",
             Self::Halfblocks => "halfblocks",
+            Self::Blocks => "blocks",
             Self::Off => "off",
         }
     }
@@ -111,6 +115,7 @@ pub fn parse_setting(raw: &str) -> Option<GraphicsSetting> {
         "sixel" => GraphicsSetting::Sixel,
         "iterm2" => GraphicsSetting::Iterm2,
         "halfblocks" => GraphicsSetting::Halfblocks,
+        "blocks" => GraphicsSetting::Blocks,
         "off" => GraphicsSetting::Off,
         _ => return None,
     })
@@ -141,6 +146,11 @@ pub fn from_env<F: Fn(&str) -> Option<String>>(env: F) -> Option<Protocol> {
     if program == "iterm.app" {
         return Some(Protocol::Iterm2);
     }
+    // macOS Terminal has no graphics protocol, and draws `▀` from the font,
+    // short of the cell: half blocks come out with a stripe in every row.
+    if program == "apple_terminal" {
+        return Some(Protocol::Blocks);
+    }
     if term.starts_with("foot") || term.starts_with("mlterm") {
         return Some(Protocol::Sixel);
     }
@@ -159,6 +169,7 @@ pub const fn resolve(
         GraphicsSetting::Sixel => Protocol::Sixel,
         GraphicsSetting::Iterm2 => Protocol::Iterm2,
         GraphicsSetting::Halfblocks => Protocol::Halfblocks,
+        GraphicsSetting::Blocks => Protocol::Blocks,
         GraphicsSetting::Off => Protocol::Off,
         GraphicsSetting::Auto => match (guess, answer) {
             (Some(protocol), _) => protocol,

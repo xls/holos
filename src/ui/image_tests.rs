@@ -242,3 +242,22 @@ fn a_picture_still_decoding_says_so() {
     let buf = frame(&mut app, 80, 24);
     assert!(text(&buf).contains("decoding shot.png"), "{}", text(&buf));
 }
+
+#[test]
+fn blocks_draw_the_picture_as_coloured_spaces_with_no_half_block_glyph() {
+    let mut app = app_with_picture(Protocol::Blocks);
+    let buf = frame(&mut app, 80, 24);
+    assert!(
+        half_blocks(&buf).is_empty(),
+        "no glyph to be drawn short of the cell"
+    );
+    let area = buf.area;
+    let red = (area.top()..area.bottom())
+        .flat_map(|y| (area.left()..area.right()).map(move |x| (x, y)))
+        .filter(|&(x, y)| buf[(x, y)].symbol() == " " && buf[(x, y)].bg == Color::Rgb(255, 0, 0))
+        .count();
+    assert!(
+        red > 10,
+        "the red half of the picture, as cell backgrounds: {red}"
+    );
+}

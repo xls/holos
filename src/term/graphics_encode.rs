@@ -277,7 +277,7 @@ impl Painter {
                 Protocol::Kitty => kitty(img, place.cols, place.rows),
                 Protocol::Sixel => sixel(img, bg),
                 Protocol::Iterm2 => iterm2(img, place.cols, place.rows),
-                Protocol::Halfblocks | Protocol::Off => Vec::new(),
+                Protocol::Halfblocks | Protocol::Blocks | Protocol::Off => Vec::new(),
             };
             if !bytes.is_empty() {
                 // Save the cursor, go to the cell, draw, come back: the frame
